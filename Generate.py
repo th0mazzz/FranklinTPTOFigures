@@ -4,6 +4,7 @@ import pandas as pd
 import openpyxl
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
+from openpyxl.drawing.image import Image
 
 # DEFINING FUNCTIONS
 def colLettersToNumber(letters):
@@ -156,7 +157,7 @@ def createIntersectionBorders(worksheet, main_coords):
     middle_cell = splitCellCoord(hori_midpoint_cell)[0] + str(splitCellCoord(vert_midpoint_cell)[1])
     ws[middle_cell].border = Border(bottom=Side(style='thin'), right=Side(style='thin'))    
 
-def generateFigure(ws, origin):
+def generateFigure(ws, df, df_row, origin):
 
     # CREATE LAYOUT IN EXCEL SPREADSHEET
     header_coords = [None, None]
@@ -168,6 +169,7 @@ def generateFigure(ws, origin):
         main_coords = [relativeToCell(origin, [('down', 2)]), relativeToCell(origin, [('right', main_display_width-1), ('down', main_display_height + header_height-1)])]
         fillCellColors(ws, header_coords[0], header_coords[1], header_color, 'solid')
         createThickOutsideBorders(ws, header_coords[0], header_coords[1])
+        ws.merge_cells(header_coords[0] + ":" + header_coords[1])
     else:
         main_coords = [origin, relativeToCell(origin, [('right', main_display_width-1), ('down', main_display_height-1)])]
 
@@ -180,6 +182,20 @@ def generateFigure(ws, origin):
     # print('origin: ' + str(origin))
     # print('header: ' + str(header_coords))
     # print('main: ' + str(main_coords))
+
+    if int_num_box: 
+        if not main_border:
+            box_topleft = main_coords[0]
+            box_bottomright = relativeToCell(box_topleft, [('down', 1), ('right', 1)])
+            ws.merge_cells(box_topleft + ":" + box_bottomright)
+        else:
+            box_topleft = relativeToCell(main_coords[0], [('down', 1), ('right', 1)])
+            box_bottomright = relativeToCell(box_topleft, [('down', 1), ('right', 1)])
+            ws.merge_cells(box_topleft + ":" + box_bottomright)
+        fillCellColors(ws, box_topleft, box_bottomright, int_num_box_color, 'solid')
+        int_num = df.loc[df_row, 'Int. ID 1']
+        ws[box_topleft].value = int_num
+        ws[box_topleft].alignment = Alignment(horizontal='center', vertical='center')
 
 
     if cardinal_dirs:
@@ -244,6 +260,34 @@ def generateFigure(ws, origin):
 
     createThickOutsideBorders(ws, main_coords[0], main_coords[1])
     createIntersectionBorders(ws, main_coords)
+    if int_num_box:
+        createThickOutsideBorders(ws, box_topleft, box_bottomright)
+
+
+    # THIS WILL LIKELY NEED CODE TO TACKLE THE INSTANCE WHERE THERE ARE NO SIGNS 
+    # PROBABLY A TRY-CATCH OR SOMETHING ELSE TO DETECT IF THE SIGN IS A NAN
+    nb_sign = df.loc[df_row, '@image_NB_sign'][:-3] + 'png'
+    nb_sign_coord = relativeToCell(cell_east.coordinate, [('down', 2), ('left', 2)])
+    insertImage(ws, nb_sign_coord, img_dir_path, nb_sign, 0, 30, 30)
+
+    sb_sign = df.loc[df_row, '@image_SB_sign'][:-3] + 'png'
+    sb_sign_coord = relativeToCell(cell_west.coordinate, [('up', 1), ('right', 1)])
+    insertImage(ws, sb_sign_coord, img_dir_path, sb_sign, 180, 30, 30)
+
+    wb_sign = df.loc[df_row, '@image_WB_sign'][:-3] + 'png'
+    wb_sign_coord = relativeToCell(cell_north.coordinate, [('down', 1), ('right', 1)])
+    insertImage(ws, wb_sign_coord, img_dir_path, wb_sign, 90, 30, 30)
+
+    eb_sign = df.loc[df_row, '@image_EB_sign'][:-3] + 'png'
+    eb_sign_coord = relativeToCell(cell_south.coordinate, [('up', 2), ('left', 1)])
+    insertImage(ws, eb_sign_coord, img_dir_path, eb_sign, 270, 30, 30)
+    
+    try: 
+        signal = df.loc[df_row, '@image_light'][:-3] + 'png'
+        signal_coord = relativeToCell(cell_north.coordinate, [('down', int(main_display_height/2) - 1)])
+        insertImage(ws, signal_coord, img_dir_path, signal, 0, 42, 42)
+    except TypeError:
+        dummy = 'do nothing'
 
     return None
 
@@ -254,6 +298,7 @@ def importVolumes(ws, df, df_row, origin, travel_dir):
     lanes = []
     for i in range(1,7):
         lanes.append(travel_dir + str(i))
+    print(lanes)
 
     if travel_dir == 'EB':
         translation_list = [('down', int(height/2 + 3)), ('right', int(width/2 - 4))]
@@ -277,21 +322,64 @@ def importVolumes(ws, df, df_row, origin, travel_dir):
         print(df.loc[df_row, 'Scenario'] + ' ' + lane_num)
         print(df.loc[df_row, lane_num])
 
-        print('Lane Coordinate: ' + lane_coord)
+        lane_arrows = []
+        for i in range(0,3):
+            lane_arrows.append('@image_' + lane_num + '.' + str(i))
+        print(lane_arrows)
+
+        # print('Lane Coordinate: ' + lane_coord)
 
         ws[lane_coord] = df.loc[df_row, lane_num]
         
         if travel_dir == 'EB':
             ws[lane_coord].alignment = Alignment(horizontal='right')
-            lane_coord = relativeToCell(lane_coord, [('down', 1)])
+            lane_arrow_coord = relativeToCell(lane_coord, [('right', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImage(ws, lane_arrow_coord, img_dir_path, img_file_name, 0, 30, 30)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
+            lane_coord = relativeToCell(lane_coord, [('down', 1)])  
+
         elif travel_dir == 'NB':
             cells_to_merge_nb = lane_coord + ":" + relativeToCell(lane_coord, [('down', int(height/2)-5)])
             ws.merge_cells(cells_to_merge_nb)
             ws[lane_coord].alignment = Alignment(textRotation=90, vertical='top')
+
+            lane_arrow_coord = relativeToCell(lane_coord, [('up', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImage(ws, lane_arrow_coord, img_dir_path, img_file_name, 90, 30, 30)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
             lane_coord = relativeToCell(lane_coord, [('right', 1)])
+
         elif travel_dir == 'WB':
             ws[lane_coord].alignment = Alignment(horizontal='left')
+
+            lane_arrow_coord = relativeToCell(lane_coord, [('left', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImage(ws, lane_arrow_coord, img_dir_path, img_file_name, 180, 30, 30)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
             lane_coord = relativeToCell(lane_coord, [('up', 1)])
+
         elif travel_dir == 'SB':
             cells_to_merge_sb = relativeToCell(lane_coord, [('up', int(height/2)-5)]) + ":" + lane_coord
             ws.merge_cells(cells_to_merge_sb)
@@ -300,14 +388,39 @@ def importVolumes(ws, df, df_row, origin, travel_dir):
             # Special case for SB volumes because of the cell merging coordinate change
             ws[lane_coord_sb_merged] = df.loc[df_row, lane_num]
 
+            lane_arrow_coord = relativeToCell(lane_coord, [('down', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImage(ws, lane_arrow_coord, img_dir_path, img_file_name, 270, 30, 30)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
             lane_coord = relativeToCell(lane_coord, [('left', 1)])
 
-            
+def insertImage(ws, coord, img_path, img_name, rotation, img_height, img_width):
 
+    img = Image(img_path + "\\" + img_name)
+    img.width = img_height
+    img.height = img_width  
+    # img.format(rotation = 90) # NEED TO ADD ROTATION CODE HERE
+    ws.add_image(img, coord)
     
-
-    # print(lanes)
     return
+
+# def insertTrafficControl(ws, df, df_row, coord, img_path):
+#     travel_dirs = ['EB', 'NB', 'WB', 'SB']
+#     sign_rots = {'EB': 0, 'NB': 90, 'WB': 180, 'SB': 270}
+#     for dir in travel_dirs: 
+#         dir_sign = '@image_' + dir + '_sign'
+#         dir_sign_filename = df.loc[df_row, dir_sign]
+        
+#         insertImage(ws, coord, img_path, dir_sign_filename, sign_rots[dir])
+
+#     return
 
 def populateFigure(ws, df, df_row, origin):
     ws[origin] = origin
@@ -335,18 +448,18 @@ def populateFigure(ws, df, df_row, origin):
     ws[wb_roadname_cell] = wb_roadname
     ws[wb_roadname_cell].alignment = Alignment(horizontal='right')
 
-    nb_roadname = df.loc[df_row, 'NB Road Name ']
-    nb_translate_list_topleft = [('right', int(width/2)-1), ('down', 1)]
-    nb_translate_list_bottomright = [('right', int(width/2)-1), ('down', int(height/2-1))]
+    sb_roadname = df.loc[df_row, 'SB Road Name']
+    sb_translate_list_topleft = [('right', int(width/2)-1), ('down', 1)]
+    sb_translate_list_bottomright = [('right', int(width/2)-1), ('down', int(height/2-1))]
     if header:
-        nb_translate_list_topleft.append(('down', header_height))
-        nb_translate_list_bottomright.append(('down', header_height))
-    nb_roadname_topleft_cell = relativeToCell(origin, nb_translate_list_topleft)
-    nb_roadname_bottomright_cell = relativeToCell(origin, nb_translate_list_bottomright)
-    nb_roadname_cellstomerge = nb_roadname_topleft_cell + ":" + nb_roadname_bottomright_cell
-    ws.merge_cells(nb_roadname_cellstomerge)
-    ws[nb_roadname_topleft_cell] = nb_roadname
-    ws[nb_roadname_topleft_cell].alignment = Alignment(textRotation=90, vertical='top')
+        sb_translate_list_topleft.append(('down', header_height))
+        sb_translate_list_bottomright.append(('down', header_height))
+    sb_roadname_topleft_cell = relativeToCell(origin, sb_translate_list_topleft)
+    sb_roadname_bottomright_cell = relativeToCell(origin, sb_translate_list_bottomright)
+    sb_roadname_cellstomerge = sb_roadname_topleft_cell + ":" + sb_roadname_bottomright_cell
+    ws.merge_cells(sb_roadname_cellstomerge)
+    ws[sb_roadname_topleft_cell] = sb_roadname
+    ws[sb_roadname_topleft_cell].alignment = Alignment(textRotation=90, vertical='top')
 
     nb_roadname = df.loc[df_row, 'NB Road Name ']
     nb_translate_list_topleft = [('right', int(width/2)), ('down', int(height/2))]
@@ -366,7 +479,25 @@ def populateFigure(ws, df, df_row, origin):
     importVolumes(ws, df, df_row, origin, 'NB')
     importVolumes(ws, df, df_row, origin, 'WB')
     importVolumes(ws, df, df_row, origin, 'SB')
-    return
+
+    # NEED TO INSERT LOGIC FOR NO STREET NAMES, NAN IS COMING OUT AS FLOAT
+    # if header:
+    #     header_str = ''
+
+    #     if nb_roadname == sb_roadname:
+    #         header_str = header_str + nb_roadname + " & "
+    #     else:
+    #         header_str = header_str + nb_roadname + "/" + sb_roadname + " & "
+
+    #     if eb_roadname == wb_roadname: 
+    #         header_str = header_str + eb_roadname + " & "
+    #     else:
+    #         header_str = header_str + eb_roadname + "/" + wb_roadname
+
+    #     ws[relativeToCell(origin, ('down', header_height))].value = header_str
+
+    # return    
+    
 
 # GET THE CURRENT SCRIPT DIRECTORY
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -390,15 +521,20 @@ if header:
     header_height = 2
 main_border = True       # Boolean for border around main area
 cardinal_dirs = True     # Boolean for cardinal directions
+int_num_box = True
 
 main_background_color = 'A6C9EC'
 main_border_color = 'DAE9F8'      
 header_color = '83CCEB'
+int_num_box_color = 'C6C9EC'
 
 gap = 3
 jump = main_display_height + gap 
 if header:
     jump = jump + 2
+
+# IMAGE PATHS
+img_dir_path = '.\PNG'
 
 #  CREATE EXCEL SPREADSHEET
 wb = Workbook()
@@ -416,8 +552,10 @@ for scenario in unique_scenarios:
 
         if df.loc[i, 'Scenario'] == scenario:
             local_fig_origin = origin_col + str(curr_row)
-            generateFigure(ws, local_fig_origin)
+            generateFigure(ws, df, i, local_fig_origin)
             populateFigure(ws, df, i, local_fig_origin)
+            # if header:
+            #     populateHeader(ws, df, i, local_fig_origin)
             curr_row = curr_row + jump
 
 
