@@ -5,6 +5,7 @@ import openpyxl
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.drawing.image import Image
+from PIL import Image as PILImage
 
 # DEFINING FUNCTIONS
 def colLettersToNumber(letters):
@@ -170,6 +171,7 @@ def generateFigure(ws, df, df_row, origin):
         fillCellColors(ws, header_coords[0], header_coords[1], header_color, 'solid')
         createThickOutsideBorders(ws, header_coords[0], header_coords[1])
         ws.merge_cells(header_coords[0] + ":" + header_coords[1])
+        
     else:
         main_coords = [origin, relativeToCell(origin, [('right', main_display_width-1), ('down', main_display_height-1)])]
 
@@ -403,27 +405,24 @@ def importVolumes(ws, df, df_row, origin, travel_dir):
 
 def insertImage(ws, coord, img_path, img_name, rotation, img_height, img_width):
 
-    img = Image(img_path + "\\" + img_name)
+    pil_img = PILImage.open(img_path + img_name)
+    rotated_img = pil_img.rotate(rotation, expand=True)
+    print("Original Image Path")
+    print(img_path + img_name)
+    temp_img_path = img_path + "\\temp\\" + str(rotation) + "_" + img_name[1:]
+    print("Temporary Image Path")
+    print(temp_img_path)
+    rotated_img.save(temp_img_path)
+
+    img = Image(temp_img_path)
     img.width = img_height
     img.height = img_width  
-    # img.format(rotation = 90) # NEED TO ADD ROTATION CODE HERE
     ws.add_image(img, coord)
-    
+    # wb.save(fr'{script_dir}\Figures.xlsx')
     return
 
-# def insertTrafficControl(ws, df, df_row, coord, img_path):
-#     travel_dirs = ['EB', 'NB', 'WB', 'SB']
-#     sign_rots = {'EB': 0, 'NB': 90, 'WB': 180, 'SB': 270}
-#     for dir in travel_dirs: 
-#         dir_sign = '@image_' + dir + '_sign'
-#         dir_sign_filename = df.loc[df_row, dir_sign]
-        
-#         insertImage(ws, coord, img_path, dir_sign_filename, sign_rots[dir])
-
-#     return
-
 def populateFigure(ws, df, df_row, origin):
-    ws[origin] = origin
+    # ws[origin] = origin
     height = main_display_height
     width = main_display_width
 
@@ -481,22 +480,60 @@ def populateFigure(ws, df, df_row, origin):
     importVolumes(ws, df, df_row, origin, 'SB')
 
     # NEED TO INSERT LOGIC FOR NO STREET NAMES, NAN IS COMING OUT AS FLOAT
-    # if header:
-    #     header_str = ''
+    if header:
+        header_str = ''
 
-    #     if nb_roadname == sb_roadname:
-    #         header_str = header_str + nb_roadname + " & "
-    #     else:
-    #         header_str = header_str + nb_roadname + "/" + sb_roadname + " & "
+        if type(nb_roadname) == float and math.isnan(nb_roadname): 
+            nb_roadname = ""
+        if type(sb_roadname) == float and math.isnan(sb_roadname):
+            sb_roadname = ""
+        if type(eb_roadname) == float and math.isnan(eb_roadname):
+            eb_roadname = ""
+        if type(wb_roadname) == float and math.isnan(wb_roadname):
+            wb_roadname = ""
 
-    #     if eb_roadname == wb_roadname: 
-    #         header_str = header_str + eb_roadname + " & "
-    #     else:
-    #         header_str = header_str + eb_roadname + "/" + wb_roadname
+        # print("nb_roadname")
+        # print(nb_roadname)
+        # print("sb_roadname")
+        # print(sb_roadname)
+        # print("eb_roadname")
+        # print(eb_roadname)
+        # print("wb_roadname")
+        # print(wb_roadname)
 
-    #     ws[relativeToCell(origin, ('down', header_height))].value = header_str
+        # If both road names the same and not empty 
+        if nb_roadname == sb_roadname and len(nb_roadname) > 0: 
+            header_str = header_str + nb_roadname + " & "
+        # If nb_roadname is empty while sb_roadname is not 
+        elif nb_roadname == "" and len(sb_roadname) > 0:
+            header_str = header_str + sb_roadname + " & "
+        # If sb_roadname is empty while nb_roadname is not 
+        elif sb_roadname == "" and len(nb_roadname) > 0:
+            header_str = header_str + nb_roadname
+        # If both nb_roadname and sb_roadname are not empty and are different 
+        else: 
+            header_str = header_str + nb_roadname + " / " + sb_roadname + " & "
 
-    # return    
+        # If both road names the same and not empty 
+        if eb_roadname == wb_roadname and len(eb_roadname) > 0: 
+            header_str = header_str + eb_roadname
+        # If eb_roadname is empty while wb_roadname is not 
+        elif eb_roadname == "" and len(wb_roadname) > 0:
+            header_str = header_str + wb_roadname
+        # If wb_roadname is empty while eb_roadname is not 
+        elif wb_roadname == "" and len(eb_roadname) > 0:
+            header_str = header_str + eb_roadname
+        # If both eb_roadname and wb_roadname are not empty and are different 
+        else: 
+            header_str = header_str + eb_roadname + " / " + wb_roadname
+
+        int_num = df.loc[df_row, 'Int. ID 1']
+        header_str = "Intersection " + str(int_num) + ": " + header_str
+
+        ws[origin].value = header_str
+        ws[origin].alignment = Alignment(horizontal='center', vertical='center')
+
+    return    
     
 
 # GET THE CURRENT SCRIPT DIRECTORY
@@ -544,7 +581,7 @@ for scenario in unique_scenarios:
     ws = wb.create_sheet(scenario)
     ws.sheet_view.zoomScale = 115
 
-    setColumnWidths(ws, 3)
+    setColumnWidths(ws, 2.6)
 
     origin_col, origin_row = splitCellCoord(origin)
     curr_row = int(origin_row)
