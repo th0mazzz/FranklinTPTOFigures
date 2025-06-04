@@ -2,10 +2,12 @@
 ****************** IMPORTING MODULES ******************
 '''
 import os
+import tkinter as tk
+from tkinter import filedialog
 import math
 import pandas as pd
-import openpyxl
-import xlsxwriter
+#import openpyxl
+#import xlsxwriter
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.drawing.image import Image
@@ -13,6 +15,16 @@ from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 from openpyxl.utils.units import pixels_to_EMU, cm_to_EMU
 from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
 from PIL import Image as PILImage
+
+import sys
+
+if getattr(sys, 'frozen', False):
+    # Running in a PyInstaller bundle
+    application_path = os.path.dirname(sys.executable)
+else:
+    # Running in a normal Python environment
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
 
 '''
 ****************** DEFINING FUNCTIONS ******************
@@ -857,7 +869,13 @@ def isValidHexaCode(input_str):
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Reference _data merge.csv into hte dataframe. 
-csv_path = script_dir + "\\_data merge.csv"
+
+# Hide the root window
+root = tk.Tk()
+root.withdraw()
+
+# Open file dialog
+csv_path = filedialog.askopenfilename(title="Select Data Merge File", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
 df = pd.read_csv(csv_path)
 
 # Front-fill the scenarios in the dataframe (or flash fill). 
@@ -998,5 +1016,9 @@ for scenario in unique_scenarios:
 
 # Remove the default 'Sheet' worksheet and save the workbook. 
 wb.remove(wb['Sheet'])
-wb.save(fr'{script_dir}\Figures.xlsx')
+wb.save(fr'{application_path}\Figures.xlsx')
 
+# Open the file. 
+os.system(f"start EXCEL.EXE {'Figures.xlsx'}")
+print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
+      "{'Figures.xlsx'}" \nOpening Excel file...')
