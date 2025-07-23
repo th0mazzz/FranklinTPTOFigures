@@ -6,17 +6,18 @@ import tkinter as tk
 from tkinter import filedialog
 import math
 import pandas as pd
-#import openpyxl
+import openpyxl
 #import xlsxwriter
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
+from openpyxl.styles.colors import COLOR_INDEX
 from openpyxl.drawing.image import Image
 from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 from openpyxl.utils.units import pixels_to_EMU, cm_to_EMU
 from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
 from PIL import Image as PILImage
-
 import sys
+import color_conversion
 
 if getattr(sys, 'frozen', False):
     # Running in a PyInstaller bundle
@@ -371,53 +372,54 @@ def generateFigure(ws, df, df_row, origin):
         ws[box_topleft].value = int_num
         ws[box_topleft].alignment = Alignment(horizontal='center', vertical='center')
 
+    # Split the cell addresses to make it easier to work with. 
+    top_left_letter, top_left_number = splitCellCoord(main_coords[0])
+    bottom_right_letter, bottom_right_number = splitCellCoord(main_coords[1])
+
+    # Convert String numbers to actual numbers. 
+    top_left_number = int(top_left_number)
+    bottom_right_number = int(bottom_right_number)
+
+    # If the width of the main display area is even, then merge the following cells to obtain cell_north and cell_south, to keep the 'N' and 'S' centered on the figure. 
+    if main_display_width % 2 == 0:
+        hori_midpoint = math.floor((colLettersToNumber(bottom_right_letter) - colLettersToNumber(top_left_letter))/2 + colLettersToNumber(top_left_letter))
+        north_merge_range_str = colNumberToLetters(hori_midpoint) + str(top_left_number) + ":" + colNumberToLetters(hori_midpoint + 1) + str(top_left_number)
+        ws.merge_cells(north_merge_range_str)
+        north_merge_range = north_merge_range_str.split(':')
+        cell_north = ws[north_merge_range[0]]
+
+        south_merge_range_str = relativeToCell(north_merge_range[0], [('down', main_display_height-1)]) + ":" + relativeToCell(north_merge_range[0], [('down', main_display_height-1), ('right', 1)])
+        ws.merge_cells(south_merge_range_str)
+        south_merge_range = south_merge_range_str.split(":")
+        cell_south = ws[south_merge_range[0]]
+
+    # Otherwise, if the width of the main display is odd, then no merging is necessary (because one cell will be the true "center"). 
+    else: 
+        hori_midpoint = math.floor((colLettersToNumber(bottom_right_letter) - colLettersToNumber(top_left_letter))/2 + colLettersToNumber(top_left_letter))
+        cell_north = ws[colNumberToLetters(hori_midpoint) + str(top_left_number)]
+        cell_south = ws[relativeToCell(colNumberToLetters(hori_midpoint) + str(top_left_number), [('down', main_display_height-1)])]
+
+    # If the height of the main display area is even, then merge the following cells to obtain cell_east and cell_west, to keep the 'E' and 'W' centered on the figure. 
+    if main_display_height % 2 == 0:
+        vert_midpoint = math.floor((bottom_right_number - top_left_number)/2 + top_left_number)
+        west_merge_range_str = top_left_letter + str(vert_midpoint) + ":" + top_left_letter + str(vert_midpoint + 1)
+        ws.merge_cells(west_merge_range_str)
+        west_merge_range = west_merge_range_str.split(':')
+        cell_west = ws[west_merge_range[0]]
+
+        east_merge_range_str = relativeToCell(west_merge_range[0], [('right', main_display_width-1)]) + ":" + relativeToCell(west_merge_range[0], [('right', main_display_width-1), ('down', 1)])
+        ws.merge_cells(east_merge_range_str)
+        east_merge_range = east_merge_range_str.split(":")
+        cell_east = ws[east_merge_range[0]]
+
+    # Otherwise, if the height of the main display is odd, then no merging is necessary (because one cell will be the true "center"). 
+    else: 
+        vert_midpoint = math.floor((colLettersToNumber(bottom_right_letter) - colLettersToNumber(top_left_letter))/2 + colLettersToNumber(top_left_letter))
+        cell_west = ws[top_left_letter + str(vert_midpoint)]
+        cell_east = ws[relativeToCell(top_left_letter + str(vert_midpoint), [('down', main_display_height-1)])]
+
     # If cardinal directions are desired...
     if cardinal_dirs:
-        # Split the cell addresses to make it easier to work with. 
-        top_left_letter, top_left_number = splitCellCoord(main_coords[0])
-        bottom_right_letter, bottom_right_number = splitCellCoord(main_coords[1])
-
-        # Convert String numbers to actual numbers. 
-        top_left_number = int(top_left_number)
-        bottom_right_number = int(bottom_right_number)
-
-        # If the width of the main display area is even, then merge the following cells to obtain cell_north and cell_south, to keep the 'N' and 'S' centered on the figure. 
-        if main_display_width % 2 == 0:
-            hori_midpoint = math.floor((colLettersToNumber(bottom_right_letter) - colLettersToNumber(top_left_letter))/2 + colLettersToNumber(top_left_letter))
-            north_merge_range_str = colNumberToLetters(hori_midpoint) + str(top_left_number) + ":" + colNumberToLetters(hori_midpoint + 1) + str(top_left_number)
-            ws.merge_cells(north_merge_range_str)
-            north_merge_range = north_merge_range_str.split(':')
-            cell_north = ws[north_merge_range[0]]
-
-            south_merge_range_str = relativeToCell(north_merge_range[0], [('down', main_display_height-1)]) + ":" + relativeToCell(north_merge_range[0], [('down', main_display_height-1), ('right', 1)])
-            ws.merge_cells(south_merge_range_str)
-            south_merge_range = south_merge_range_str.split(":")
-            cell_south = ws[south_merge_range[0]]
-
-        # Otherwise, if the width of the main display is odd, then no merging is necessary (because one cell will be the true "center"). 
-        else: 
-            hori_midpoint = math.floor((colLettersToNumber(bottom_right_letter) - colLettersToNumber(top_left_letter))/2 + colLettersToNumber(top_left_letter))
-            cell_north = ws[colNumberToLetters(hori_midpoint) + str(top_left_number)]
-            cell_south = ws[relativeToCell(colNumberToLetters(hori_midpoint) + str(top_left_number), [('down', main_display_height-1)])]
-
-        # If the height of the main display area is even, then merge the following cells to obtain cell_east and cell_west, to keep the 'E' and 'W' centered on the figure. 
-        if main_display_height % 2 == 0:
-            vert_midpoint = math.floor((bottom_right_number - top_left_number)/2 + top_left_number)
-            west_merge_range_str = top_left_letter + str(vert_midpoint) + ":" + top_left_letter + str(vert_midpoint + 1)
-            ws.merge_cells(west_merge_range_str)
-            west_merge_range = west_merge_range_str.split(':')
-            cell_west = ws[west_merge_range[0]]
-
-            east_merge_range_str = relativeToCell(west_merge_range[0], [('right', main_display_width-1)]) + ":" + relativeToCell(west_merge_range[0], [('right', main_display_width-1), ('down', 1)])
-            ws.merge_cells(east_merge_range_str)
-            east_merge_range = east_merge_range_str.split(":")
-            cell_east = ws[east_merge_range[0]]
-
-        # Otherwise, if the height of the main display is odd, then no merging is necessary (because one cell will be the true "center"). 
-        else: 
-            vert_midpoint = math.floor((colLettersToNumber(bottom_right_letter) - colLettersToNumber(top_left_letter))/2 + colLettersToNumber(top_left_letter))
-            cell_west = ws[top_left_letter + str(vert_midpoint)]
-            cell_east = ws[relativeToCell(top_left_letter + str(vert_midpoint), [('down', main_display_height-1)])]
 
         # Assign the value 'N' to the north cardinal direction cell and format. 
         cell_north.value = 'N'
@@ -865,10 +867,13 @@ def isValidHexaCode(input_str):
 '''
 ****************** EXECUTING THE MAIN SCRIPT BELOW ******************
 '''
+# Create the Excel workbook. 
+wb = Workbook()
+
 # Get the current script directory. 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Reference _data merge.csv into hte dataframe. 
+# Reference _data merge.csv into the dataframe. 
 
 # Hide the root window
 root = tk.Tk()
@@ -886,88 +891,163 @@ origin = 'B2'
 main_display_height = 26    # Would recommend keeping this value. Recommend at least even number (code may not work well for odd) and at least 26. 
 main_display_width = 24     # Would recommend keeping this value. Recommend at least even number (code may not work well for odd) and at least 24. 
 
-# Obtain user input for header selection (yes or no). 
-user_input_header = input("\nWould you like a header for your figures? Please enter Y or N: ")
-while user_input_header.upper() != 'Y' and user_input_header.upper() != 'N': 
-    user_input_header = input("\nSilly Goose, that wasn't a valid response. Would you like a header for your figures? Please enter Y or N: ")
-if user_input_header.upper() == 'Y':
-    header = True            
-elif user_input_header.upper() == 'N':
-    header = False 
+# If the following boolean is set to true, then the code will read from Inputs.xlsx. Otherwise, the code will prompt the user via command line for inputs. 
+xlsx_inputs = True
+
+if not xlsx_inputs:
+    # Obtain user input for header selection (yes or no). 
+    user_input_header = input("\nWould you like a header for your figures? Please enter Y or N: ")
+    while user_input_header.upper() != 'Y' and user_input_header.upper() != 'N': 
+        user_input_header = input("\nSilly Goose, that wasn't a valid response. Would you like a header for your figures? Please enter Y or N: ")
+    if user_input_header.upper() == 'Y':
+        header = True            
+    elif user_input_header.upper() == 'N':
+        header = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+
+    # If the user selects yes to header, set the header_height. 
+    if header:
+        header_height = 2
+
+    # Obtain user input for main border selection (yes or no). 
+    user_input_main_border = input("\nWould you like a border for the main display area of your figures? Please enter Y or N: ")
+    while user_input_main_border.upper() != 'Y' and user_input_main_border.upper() != 'N': 
+        user_input_main_border = input("\nSilly Goose, that wasn't a valid response. Would you like a border for the main display area of your figures? Please enter Y or N: ")
+    if user_input_main_border.upper() == 'Y':
+        main_border = True            
+    elif user_input_main_border.upper() == 'N':
+        main_border = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+
+    # Obtain user input for cardinal directions selection (yes or no). 
+    user_input_cardinal_dirs = input("\nWould you like cardinal directions on your figures? Please enter Y or N: ")
+    while user_input_cardinal_dirs.upper() != 'Y' and user_input_cardinal_dirs.upper() != 'N': 
+        user_input_cardinal_dirs = input("\nSilly Goose, that wasn't a valid response. Would you like cardinal directions on your figures? Please enter Y or N: ")
+    if user_input_cardinal_dirs.upper() == 'Y':
+        cardinal_dirs = True            
+    elif user_input_cardinal_dirs.upper() == 'N':
+        cardinal_dirs = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+
+    # Obtain user input for intersection number box selection (yes or no). 
+    user_input_int_num_box = input("\nWould you like an intersection number box for your figures? Please enter Y or N: ")
+    while user_input_int_num_box.upper() != 'Y' and user_input_int_num_box.upper() != 'N': 
+        user_input_int_num_box = input("\nSilly Goose, that wasn't a valid response. Would you like an intersection number box for your figures? Please enter Y or N: ")
+    if user_input_int_num_box.upper() == 'Y':
+        int_num_box = True            
+    elif user_input_int_num_box.upper() == 'N':
+        int_num_box = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+
+    # Obtain user input for main display area background color; if empty string is provided, will use default of 'A6C9EC'. 
+    main_bkgd_color = 'A6C9EC'
+    user_input_main_bkgd_color = input("\nPlease input the hexadecimal color code of the main background color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+    while not isValidHexaCode(user_input_main_bkgd_color) and user_input_main_bkgd_color != '': 
+        user_input_main_bkgd_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the main background color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+    if user_input_main_bkgd_color != '':
+        main_bkgd_color = user_input_main_bkgd_color
+
+    # Obtain user input for main border color, since user indicated they wanted a border; if empty string is provided, will use default of 'DAE9F8'. 
+    if main_border: 
+        main_border_color = 'DAE9F8'      
+        user_input_main_border_color = input("\nPlease input the hexadecimal color code of the main border color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+        while not isValidHexaCode(user_input_main_border_color) and user_input_main_border_color != '': 
+            user_input_main_border_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the main border color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+        if user_input_main_border_color != '':
+            main_border_color = user_input_main_border_color
+
+    # Obtain user input for header color, since user indicated they wanted a header; if empty string is provided, will use default of '83CCEB'. 
+    if header: 
+        header_color = '83CCEB'  
+        user_input_header_color = input("\nPlease input the hexadecimal color code of the header color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+        while not isValidHexaCode(user_input_header_color) and user_input_header_color != '': 
+            user_input_header_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the header color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+        if user_input_header_color != '':
+            header_color = user_input_header_color
+
+    # Obtain user input for intersection number box color, since user indicated they wanted a they wanted one; if empty string is provided, will use default of 'C6C9EC'. 
+    if int_num_box: 
+        int_num_box_color = 'C6C9EC'  
+        user_input_int_num_box_color = input("\nPlease input the hexadecimal color code of the intersection number box color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+        while not isValidHexaCode(user_input_int_num_box_color) and user_input_int_num_box_color != '': 
+            user_input_int_num_box_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the intersection number box color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
+        if user_input_int_num_box_color != '':
+            int_num_box_color = user_input_int_num_box_color
 else:
-    raise Exception("Something went wrong if this error shows up.")
+    wb_inputs = openpyxl.load_workbook("./Inputs.xlsx", read_only=True)
+    ws_inputs = wb_inputs["Inputs"]
 
-# If the user selects yes to header, set the header_height. 
-if header:
-    header_height = 2
+    # Obtain user input for header selection (yes or no). 
+    header_input = ws_inputs["B4"].value
+    if header_input.upper() == 'Y':
+        header = True    
+    elif header_input.upper() == 'N':
+        header = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
+    # If the user selects yes to header, set the header_height. 
+    if header:
+        header_height = 2
 
-# Obtain user input for main border selection (yes or no). 
-user_input_main_border = input("\nWould you like a border for the main display area of your figures? Please enter Y or N: ")
-while user_input_main_border.upper() != 'Y' and user_input_main_border.upper() != 'N': 
-    user_input_main_border = input("\nSilly Goose, that wasn't a valid response. Would you like a border for the main display area of your figures? Please enter Y or N: ")
-if user_input_main_border.upper() == 'Y':
-    main_border = True            
-elif user_input_main_border.upper() == 'N':
-    main_border = False 
-else:
-    raise Exception("Something went wrong if this error shows up.")
+    # Obtain user input for main border selection (yes or no).
+    main_border_input = ws_inputs["B5"].value
+    if main_border_input.upper() == 'Y':
+        main_border = True    
+    elif main_border_input.upper() == 'N':
+        main_border = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
+    # Obtain user input for cardinal directions selection (yes or no).
+    cardinal_dirs_input = ws_inputs["B6"].value
+    if cardinal_dirs_input.upper() == 'Y':
+        cardinal_dirs = True    
+    elif cardinal_dirs_input.upper() == 'N':
+        cardinal_dirs = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
+    # Obtain user input for intersection number box selection (yes or no).
+    int_num_box_input = ws_inputs["B7"].value
+    if int_num_box_input.upper() == 'Y':
+        int_num_box = True    
+    elif int_num_box_input.upper() == 'N':
+        int_num_box = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
+    # Obtain user input for main display area background color. 
+    main_bkgd_color_input = ws_inputs["B9"].fill.fgColor.index
+    # print(main_bkgd_color_input)
+    # print(COLOR_INDEX)
+    # print('===============')
+    # theme = ws_inputs["B9"].fill.start_color.theme
+    # tint = ws_inputs["B9"].fill.start_color.tint
+    # color = color_conversion.theme_and_tint_to_rgb(wb, theme, tint)
+    # print(theme)
+    # print(tint)
+    # print(color)
+    main_bkgd_color = main_bkgd_color_input 
 
-# Obtain user input for cardinal directions selection (yes or no). 
-user_input_cardinal_dirs = input("\nWould you like cardinal directions on your figures? Please enter Y or N: ")
-while user_input_cardinal_dirs.upper() != 'Y' and user_input_cardinal_dirs.upper() != 'N': 
-    user_input_cardinal_dirs = input("\nSilly Goose, that wasn't a valid response. Would you like cardinal directions on your figures? Please enter Y or N: ")
-if user_input_cardinal_dirs.upper() == 'Y':
-    cardinal_dirs = True            
-elif user_input_cardinal_dirs.upper() == 'N':
-    cardinal_dirs = False 
-else:
-    raise Exception("Something went wrong if this error shows up.")
+    # Obtain user input for main border color, since user indicated they wanted a border; if empty string is provided, will use default of 'DAE9F8'. 
+    if main_border: 
+        main_border_color_input = ws_inputs["B10"].fill.fgColor.index
+        main_border_color = main_border_color_input
+    
+    # Obtain user input for header color, since user indicated they wanted a header; if empty string is provided, will use default of '83CCEB'. 
+    if header: 
+        header_color_input = ws_inputs["B11"].fill.fgColor.index
+        header_color = header_color_input
 
-# Obtain user input for intersection number box selection (yes or no). 
-user_input_int_num_box = input("\nWould you like an intersection number box for your figures? Please enter Y or N: ")
-while user_input_int_num_box.upper() != 'Y' and user_input_int_num_box.upper() != 'N': 
-    user_input_int_num_box = input("\nSilly Goose, that wasn't a valid response. Would you like an intersection number box for your figures? Please enter Y or N: ")
-if user_input_int_num_box.upper() == 'Y':
-    int_num_box = True            
-elif user_input_int_num_box.upper() == 'N':
-    int_num_box = False 
-else:
-    raise Exception("Something went wrong if this error shows up.")
-
-# Obtain user input for main display area background color; if empty string is provided, will use default of 'A6C9EC'. 
-main_bkgd_color = 'A6C9EC'
-user_input_main_bkgd_color = input("\nPlease input the hexadecimal color code of the main background color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-while not isValidHexaCode(user_input_main_bkgd_color) and user_input_main_bkgd_color != '': 
-    user_input_main_bkgd_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the main background color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-if user_input_main_bkgd_color != '':
-    main_bkgd_color = user_input_main_bkgd_color
-
-# Obtain user input for main border color, since user indicated they wanted a border; if empty string is provided, will use default of 'DAE9F8'. 
-if main_border: 
-    main_border_color = 'DAE9F8'      
-    user_input_main_border_color = input("\nPlease input the hexadecimal color code of the main border color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-    while not isValidHexaCode(user_input_main_border_color) and user_input_main_border_color != '': 
-        user_input_main_border_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the main border color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-    if user_input_main_border_color != '':
-        main_border_color = user_input_main_border_color
-
-# Obtain user input for header color, since user indicated they wanted a header; if empty string is provided, will use default of '83CCEB'. 
-if header: 
-    header_color = '83CCEB'  
-    user_input_header_color = input("\nPlease input the hexadecimal color code of the header color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-    while not isValidHexaCode(user_input_header_color) and user_input_header_color != '': 
-        user_input_header_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the header color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-    if user_input_header_color != '':
-        header_color = user_input_header_color
-
-# Obtain user input for intersection number box color, since user indicated they wanted a they wanted one; if empty string is provided, will use default of 'C6C9EC'. 
-if int_num_box: 
-    int_num_box_color = 'C6C9EC'  
-    user_input_int_num_box_color = input("\nPlease input the hexadecimal color code of the intersection number box color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-    while not isValidHexaCode(user_input_int_num_box_color) and user_input_int_num_box_color != '': 
-        user_input_int_num_box_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the intersection number box color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
-    if user_input_int_num_box_color != '':
-        int_num_box_color = user_input_int_num_box_color
+    # Obtain user input for intersection number box color, since user indicated they wanted a they wanted one; if empty string is provided, will use default of 'C6C9EC'. 
+    if int_num_box: 
+        int_num_box_color_input = ws_inputs["B12"].fill.fgColor.index
+        int_num_box_color = int_num_box_color_input
 
 # Define gap (and "jump") between the figures in the worksheet. 
 gap = 3
@@ -977,9 +1057,6 @@ if header:
 
 # The relative path of where the images are stored. 
 img_dir_path = '.\\PNG'
-
-# Create the Excel workbook. 
-wb = Workbook()
 
 # Determine all of the unique conditions scenarios, create a worksheet for each one, and set the zoom to 115%; update progress printing to terminal.
 progress = 0
