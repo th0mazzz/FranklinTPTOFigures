@@ -454,33 +454,40 @@ def generateFigure(ws, df, df_row, origin):
     # 
 
     # Insert the northbound sign into the figure. 
-    nb_sign = df.loc[df_row, '@image_NB_sign'][:-3] + 'png'
-    nb_sign_coord = relativeToCell(cell_east.coordinate, [('down', 2), ('left', 2)])
-    insertImageWithOffset(ws, nb_sign_coord, img_dir_path, nb_sign, 0, 30, 30, 0.00, 0.00)
+    sign_input_nb = df.loc[df_row, '@image_NB_sign']
+    if isinstance(sign_input_nb, str):
+        nb_sign = sign_input_nb[:-3] + 'png'
+        nb_sign_coord = relativeToCell(cell_east.coordinate, [('down', 2), ('left', 2)])
+        insertImageWithOffset(ws, nb_sign_coord, img_dir_path, nb_sign, 0, 30, 30, 0.00, 0.00)
 
     # Insert the southbound sign into the figure. 
-    sb_sign = df.loc[df_row, '@image_SB_sign'][:-3] + 'png'
-    sb_sign_coord = relativeToCell(cell_west.coordinate, [('up', 1), ('right', 1)])
-    insertImageWithOffset(ws, sb_sign_coord, img_dir_path, sb_sign, 180, 30, 30, 0.60, -0.50)
+    sign_input_sb = df.loc[df_row, '@image_SB_sign']
+    if isinstance(sign_input_sb, str):
+        sb_sign = sign_input_sb[:-3] + 'png'
+        sb_sign_coord = relativeToCell(cell_west.coordinate, [('up', 1), ('right', 1)])
+        insertImageWithOffset(ws, sb_sign_coord, img_dir_path, sb_sign, 180, 30, 30, 0.60, -0.50)
 
     # Insert the westbound sign into the figure. 
-    wb_sign = df.loc[df_row, '@image_WB_sign'][:-3] + 'png'
-    wb_sign_coord = relativeToCell(cell_north.coordinate, [('down', 1), ('right', 1)])
-    insertImageWithOffset(ws, wb_sign_coord, img_dir_path, wb_sign, 90, 30, 30, 1.00, 0.60)
+    sign_input_wb = df.loc[df_row, '@image_WB_sign']
+    if isinstance(sign_input_wb, str):
+        wb_sign = sign_input_wb[:-3] + 'png'
+        wb_sign_coord = relativeToCell(cell_north.coordinate, [('down', 1), ('right', 1)])
+        insertImageWithOffset(ws, wb_sign_coord, img_dir_path, wb_sign, 90, 30, 30, 1.00, 0.60)
 
     # Insert the eastbound sign into the figure. 
-    eb_sign = df.loc[df_row, '@image_EB_sign'][:-3] + 'png'
-    eb_sign_coord = relativeToCell(cell_south.coordinate, [('up', 2), ('left', 1)])
-    insertImageWithOffset(ws, eb_sign_coord, img_dir_path, eb_sign, 270, 30, 30, -0.50, 0.00)
+    sign_input_eb = df.loc[df_row, '@image_EB_sign']
+    if isinstance(sign_input_eb, str):
+        eb_sign = sign_input_eb[:-3] + 'png'
+        eb_sign_coord = relativeToCell(cell_south.coordinate, [('up', 2), ('left', 1)])
+        insertImageWithOffset(ws, eb_sign_coord, img_dir_path, eb_sign, 270, 30, 30, -0.50, 0.00)
     
     # Insert a signal image if the intersection row in the dataframe has one, if not, do nothing. 
-    try: 
+    signal_input = df.loc[df_row, '@image_light']
+    if isinstance(signal_input, str):
         signal = df.loc[df_row, '@image_light'][:-3] + 'png'
         signal_coord = relativeToCell(cell_north.coordinate, [('down', int(main_display_height/2) - 1)])
         insertImageWithOffset(ws, signal_coord, img_dir_path, signal, 0, 42, 42, -0.10, -0.10)
-    except TypeError:
-        dummy = 'do nothing'
-
+    
     return None
 
 def importVolumes(ws, df, df_row, origin, travel_dir):
@@ -978,7 +985,7 @@ if not xlsx_inputs:
         if user_input_int_num_box_color != '':
             int_num_box_color = user_input_int_num_box_color
 else:
-    wb_inputs = openpyxl.load_workbook("./Inputs.xlsx", read_only=True)
+    wb_inputs = openpyxl.load_workbook("./Inputs.xlsm", read_only=True)
     ws_inputs = wb_inputs["Inputs"]
 
     # Obtain user input for header selection (yes or no). 
@@ -1086,7 +1093,7 @@ for scenario in unique_scenarios:
             curr_row = curr_row + jump
 
             progress = progress + progress_i
-            print(str(math.ceil(progress * 100)) + '% complete!')
+            print(str(round(progress * 100)) + '% complete!')
 
     
 
