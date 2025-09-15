@@ -186,19 +186,21 @@ def fillCellColors(worksheet, range_start, range_end, color, f_type):
 
 def setColumnWidths(worksheet, desired_width):
     '''
-    PURPOSE/DESCRIPTION: Sets Column A through Column Z to be a specified width. 
+    PURPOSE/DESCRIPTION: Sets Column A through Column FZ to be a specified width. 
 
     INPUT: 
     worksheet (Worksheet): The worksheet where this function will be applied. 
-    desired_width (int/double/float): The desired width of Column A through Column Z. 
+    desired_width (int/double/float): The desired width of Column A through Column FZ. 
 
     OUTPUT: 
     N/A. 
     '''
-    # Iterate through all the columns from A to Z and change the column width. 
+    # Iterate through all the columns from A to FZ and change the column width. 
     cols = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-    for col in cols:
-        worksheet.column_dimensions[col].width = desired_width
+    prefixes = ['', 'A', 'B', 'C', 'D', 'E', 'F']
+    for prefix in prefixes: 
+        for col in cols:
+            worksheet.column_dimensions[prefix + col].width = desired_width
 
 def createThickOutsideBorders(worksheet, range_start, range_end):
     '''
@@ -368,6 +370,7 @@ def generateFigure(ws, df, df_row, origin):
             ws.merge_cells(box_topleft + ":" + box_bottomright)
         # Format the intersection number box and assign it the proper intersection number. 
         fillCellColors(ws, box_topleft, box_bottomright, int_num_box_color, 'solid')
+
         int_num = df.loc[df_row, 'Int. ID 1']
         ws[box_topleft].value = int_num
         ws[box_topleft].alignment = Alignment(horizontal='center', vertical='center')
@@ -745,7 +748,7 @@ def populateFigure(ws, df, df_row, origin):
     # Determine what is the current scenario and write it to the worksheet next to the figure. This is more of a debugging tool. 
     scenario = df.loc[df_row, 'Scenario']
     scenario_cell = relativeToCell(origin, [('right', width + 1)])
-    ws[scenario_cell] = scenario
+    #ws[scenario_cell] = scenario # This line writes scenario next to figure
     
     # [STILL NEEDS TO ACCOMMODATE OVERFLOW TEXT, ALSO DOUBLE CHECK HOW THESE KEYS COME (WHETHER THERE IS A SPACE OR NOT)]
 
@@ -874,18 +877,6 @@ def isValidHexaCode(input_str):
 '''
 ****************** EXECUTING THE MAIN SCRIPT BELOW ******************
 '''
-# Create the Excel workbook. 
-wb = Workbook()
-
-# Get the current script directory. 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Reference _data merge.csv into the dataframe. 
-
-# Hide the root window
-root = tk.Tk()
-root.withdraw()
-
 # Open file dialog
 csv_path = filedialog.askopenfilename(title="Select Data Merge File", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
 df = pd.read_csv(csv_path)
@@ -984,8 +975,13 @@ if not xlsx_inputs:
             user_input_int_num_box_color = input("\nSilly Goose, that wasn't a valid response. Please input the hexadecimal color code of the intersection number box color you'd like to use without the # (if you wish to use the default color, just hit Enter): ")
         if user_input_int_num_box_color != '':
             int_num_box_color = user_input_int_num_box_color
+
+    """
+        CODER NOTES (THOMAS ZHAO): COMMAND LINE INPUT FOR DETERMINING YES AND NO FOR THE VARIOUS PLOTTING OPTIONS HAS NOT BEEN IMPLEMENTED YET. THE COMMAND LINE WILL DEFAULT TO 
+        THE INDIVIDUAL PLOTTING OF INTERSECTIONS BY SCENARIO INTO AN EXCEL FILE.
+    """
 else:
-    wb_inputs = openpyxl.load_workbook("./Inputs.xlsm", read_only=True)
+    wb_inputs = openpyxl.load_workbook("./Inputs.xlsm", read_only=True, data_only=True)
     ws_inputs = wb_inputs["Inputs"]
 
     # Obtain user input for header selection (yes or no). 
@@ -1028,6 +1024,29 @@ else:
     else:
         raise Exception("Something went wrong if this error shows up.")
     
+    # Obtain user input for individual intersection printing by scenario (yes or no).
+    indiv_int_by_scenario_input = ws_inputs["B19"].value
+    if indiv_int_by_scenario_input.upper() == 'Y':
+        indiv_int_by_scenario = True    
+    elif indiv_int_by_scenario_input.upper() == 'N':
+        indiv_int_by_scenario = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+
+    # Obtain user input for 22x34 page printing (yes or no).
+    page_22x34_input = ws_inputs["B21"].value
+    if page_22x34_input.upper() == 'Y':
+        page_22x34 = True    
+        
+        page_22x34_scenario_name = ws_inputs["E21"].value
+        if page_22x34_scenario_name is None:
+            raise Exception("Scenario needs to be selected.")
+
+    elif page_22x34_input.upper() == 'N':
+        page_22x34 = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
     # Obtain user input for main display area background color. 
     main_bkgd_color_input = ws_inputs["B9"].fill.fgColor.index
     # print(main_bkgd_color_input)
@@ -1065,44 +1084,153 @@ if header:
 # The relative path of where the images are stored. 
 img_dir_path = '.\\PNG'
 
-# Determine all of the unique conditions scenarios, create a worksheet for each one, and set the zoom to 115%; update progress printing to terminal.
-progress = 0
-progress_i = 1 / len(df.index)
-unique_scenarios = df['Scenario'].unique()
-for scenario in unique_scenarios: 
-    ws = wb.create_sheet(scenario)
-    ws.sheet_view.zoomScale = 115
+if indiv_int_by_scenario:
 
-    # Set the column widths. 
-    setColumnWidths(ws, 2.6)
+    # Create the Excel workbook. 
+    wb = Workbook()
 
-    # Split the origin's cell address (where to begin figure generation at) for ease of use and set curr_row to origin_row.  
-    origin_col, origin_row = splitCellCoord(origin)
-    curr_row = int(origin_row)
+    # Get the current script directory. 
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # For each row in the dataframe (a row represents one intersection under one scenario)...
-    for i in range(len(df.index)):
-        
-        # If the row is the scenario that we're currently iterating through...
-        if df.loc[i, 'Scenario'] == scenario:
+    # Reference _data merge.csv into the dataframe. 
 
-            # Set the local figure origin to the origin column and current row, then generate and populate the figure, and move curr_row to where the next figure will be created.
-            local_fig_origin = origin_col + str(curr_row)
-            generateFigure(ws, df, i, local_fig_origin)
-            populateFigure(ws, df, i, local_fig_origin)
-            curr_row = curr_row + jump
+    # Hide the root window
+    root = tk.Tk()
+    root.withdraw()
 
-            progress = progress + progress_i
-            print(str(round(progress * 100)) + '% complete!')
+    # Determine all of the unique conditions scenarios, create a worksheet for each one, and set the zoom to 115%; update progress printing to terminal.
+    progress = 0
+    progress_i = 1 / len(df.index)
+    unique_scenarios = df['Scenario'].unique()
+    for scenario in unique_scenarios: 
+        ws = wb.create_sheet(scenario)
+        ws.sheet_view.zoomScale = 115
 
+        # Set the column widths. 
+        setColumnWidths(ws, 2.6)
+
+        # Split the origin's cell address (where to begin figure generation at) for ease of use and set curr_row to origin_row.  
+        origin_col, origin_row = splitCellCoord(origin)
+        curr_row = int(origin_row)
+
+        # For each row in the dataframe (a row represents one intersection under one scenario)...
+        for i in range(len(df.index)):
+            
+            # If the row is the scenario that we're currently iterating through...
+            if df.loc[i, 'Scenario'] == scenario:
+
+                # Set the local figure origin to the origin column and current row, then generate and populate the figure, and move curr_row to where the next figure will be created.
+                local_fig_origin = origin_col + str(curr_row)
+                generateFigure(ws, df, i, local_fig_origin)
+                populateFigure(ws, df, i, local_fig_origin)
+                curr_row = curr_row + jump
+
+                progress = progress + progress_i
+                print(str(round(progress * 100)) + '% complete for INDIVIDUAL FIGURES BY SCENARIO!')
+
+    # Remove the default 'Sheet' worksheet and save the workbook. 
+    wb.remove(wb['Sheet'])
+    wb.save(fr'{application_path}\Figures_Individual_Int_By_Scenario.xlsx')
+
+    # Open the file. 
+    os.system(f"start EXCEL.EXE {'Figures_Individual_Int_By_Scenario.xlsx'}")
+    print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
+        "{'Figures_Individual_Int_By_Scenario.xlsx'}" \nOpening Excel file...')
+
+if page_22x34:
+    
+    ws_inputs_22x34 = wb_inputs["22x34_Layout"]
+
+    # List out the unique scenarios present in the data merge file.
+    unique_scenarios = df['Scenario'].unique()      
+
+    # If the inputted 22x34 scenario is contained within the list of unique scenarios...
+    if page_22x34_scenario_name in unique_scenarios:
+
+        # Create the Excel workbook. 
+        wb = Workbook()
+
+        # Get the current script directory. 
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Reference _data merge.csv into the dataframe. 
+
+        # Hide the root window.
+        root = tk.Tk()
+        root.withdraw()
+
+        # Determine the non-empty pages. 
+        input_pages = ['A96', 'FB96', 'LC96', 'A197', 'FB197', 'LC197', 'A298', 'FB298', 'LC298']
+        nonempty_pages = []
+        for page in input_pages: 
+            if ws_inputs_22x34[page].value == "NOT EMPTY":
+                nonempty_pages.append(page)
+
+        if len(nonempty_pages) == 0:
+            print("WARNING: No intersections have been assigned to 22x34_Layout")
+
+        # For each page, determine the filled-in intersection and populate in new spreadsheet.
+        page_num = 1
+        page_name = 'Page ' + str(page_num)
+        for page in nonempty_pages:
+            ws = wb.create_sheet(page_name)
+            ws.sheet_view.zoomScale = 55
+
+            # Set the column widths. 
+            setColumnWidths(ws, 2.6)
+
+            int_slots = {}
+            vert_offset = [0, 1, 2]
+            hori_offset = [0, 1, 2, 3, 4, 5]
+
+            # Create a dictionary with int numbers as the key and cell addresses as the value 
+            for h in hori_offset: 
+                for v in vert_offset: 
+                    base_slot = relativeToCell(page, [('up', 31), ('right', 2)])
+                    slot = relativeToCell(base_slot, [('up', 30 * v), ('right', 26 * h)])
+                    if ws_inputs_22x34[slot].value is not None:
+                        int_slots[ws_inputs_22x34[slot].value] = slot
+
+            df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name]
+
+            progress = 0
+            progress_i = 1 / len(df_scenario.index)
+
+            # for i in range(len(df_scenario.index)):
+            #     int_number = df_scenario.loc[i, 'Int. ID 1']
+            #     slot_address = int_slots[int_number]
+            #     generateFigure(ws, df, i, slot_address)
+            #     populateFigure(ws, df, i, slot_address)
+
+            for i in range(len(df_scenario.index)):
+
+                int_number = df.loc[i, 'Int. ID 1']
+                slot_address = int_slots[int_number]
+                generateFigure(ws, df_scenario, i, slot_address)
+                populateFigure(ws, df_scenario, i, slot_address)
+
+                progress = progress + progress_i
+                print(str(round(progress * 100)) + '% complete for 22x34 Layout!')
+
+        # Remove the default 'Sheet' worksheet and save the workbook. 
+        wb.remove(wb['Sheet'])
+        wb.save(fr'{application_path}\Figures_22x34_Layout.xlsx')
+
+        # Open the file. 
+        os.system(f"start EXCEL.EXE {'Figures_22x34_Layout.xlsx'}")
+        print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
+            "{'Figures_22x34_Layout.xlsx'}" \nOpening Excel file...')
+
+        """
+        ws = wb.create_sheet(page_22x34_scenario_name)
+        ws.sheet_view.zoomScale = 55
+
+        # Set the column widths. 
+        setColumnWidths(ws, 2.6)
+        """
+    
+    print('Desired Scenario is ' + page_22x34_scenario_name)
     
 
 
-# Remove the default 'Sheet' worksheet and save the workbook. 
-wb.remove(wb['Sheet'])
-wb.save(fr'{application_path}\Figures.xlsx')
 
-# Open the file. 
-os.system(f"start EXCEL.EXE {'Figures.xlsx'}")
-print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
-      "{'Figures.xlsx'}" \nOpening Excel file...')
