@@ -1173,8 +1173,20 @@ if page_22x34:
         page_num = 1
         page_name = 'Page ' + str(page_num)
         for page in nonempty_pages:
+            print(page_name)
+            print(page)
             ws = wb.create_sheet(page_name)
             ws.sheet_view.zoomScale = 55
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+
+                        
+            ws.page_setup.paperSize = 0  # 0 indicates custom paper size
+            ws.page_setup.paperWidth = "34in"  # 34 inches * 72 points
+            ws.page_setup.paperHeight = "22in"  # 22 inches * 72 points
+
+
+            # ws.page_setup.paperWidth = "34in"
+            # ws.page_setup.paperHeight = "22in"
 
             # Set the column widths. 
             setColumnWidths(ws, 2.6)
@@ -1187,9 +1199,20 @@ if page_22x34:
             for h in hori_offset: 
                 for v in vert_offset: 
                     base_slot = relativeToCell(page, [('up', 31), ('right', 2)])
-                    slot = relativeToCell(base_slot, [('up', 30 * v), ('right', 26 * h)])
-                    if ws_inputs_22x34[slot].value is not None:
-                        int_slots[ws_inputs_22x34[slot].value] = slot
+                    input_slot = relativeToCell(base_slot, [('up', 30 * v), ('right', 26 * h)])
+                    if ws_inputs_22x34[input_slot].value is not None:
+                        if page_num == 1:
+                            print('Page 1 if path triggered')
+                            int_slots[ws_inputs_22x34[input_slot].value] = input_slot
+                        else:
+                            print('Else not Page 1 if path triggered')
+                            offset_base_slot = relativeToCell(input_pages[0], [('up', 31), ('right', 2)])
+                            offset_input_slot = relativeToCell(offset_base_slot, [('up', 30 * v), ('right', 26 * h)])
+                            int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
+            
+            print('int_slots')
+            print(int_slots)
+            
 
             df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name]
 
@@ -1205,12 +1228,16 @@ if page_22x34:
             for i in range(len(df_scenario.index)):
 
                 int_number = df.loc[i, 'Int. ID 1']
-                slot_address = int_slots[int_number]
-                generateFigure(ws, df_scenario, i, slot_address)
-                populateFigure(ws, df_scenario, i, slot_address)
+                if int_number in int_slots:
+                    slot_address = int_slots[int_number]
+                    generateFigure(ws, df_scenario, i, slot_address)
+                    populateFigure(ws, df_scenario, i, slot_address)
 
-                progress = progress + progress_i
-                print(str(round(progress * 100)) + '% complete for 22x34 Layout!')
+                    progress = progress + progress_i
+                    print(str(round(progress * 100)) + '% complete for 22x34 Layout! (' + str(page_name) + ')' )
+
+            page_num = page_num + 1
+            page_name = 'Page ' + str(page_num)
 
         # Remove the default 'Sheet' worksheet and save the workbook. 
         wb.remove(wb['Sheet'])
