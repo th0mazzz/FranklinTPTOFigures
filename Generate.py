@@ -1033,17 +1033,31 @@ else:
     else:
         raise Exception("Something went wrong if this error shows up.")
 
-    # Obtain user input for 22x34 page printing (yes or no).
-    page_22x34_input = ws_inputs["B21"].value
-    if page_22x34_input.upper() == 'Y':
-        page_22x34 = True    
+    # Obtain user input for 22x34 page printing landscape (yes or no).
+    page_22x34_input_landscape = ws_inputs["B21"].value
+    if page_22x34_input_landscape.upper() == 'Y':
+        page_22x34_landscape = True    
         
-        page_22x34_scenario_name = ws_inputs["E21"].value
-        if page_22x34_scenario_name is None:
+        page_22x34_scenario_name_landscape = ws_inputs["F21"].value
+        if page_22x34_scenario_name_landscape is None:
             raise Exception("Scenario needs to be selected.")
 
-    elif page_22x34_input.upper() == 'N':
-        page_22x34 = False 
+    elif page_22x34_input_landscape.upper() == 'N':
+        page_22x34_landscape = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
+    # Obtain user input for 22x34 page printing portrait (yes or no).
+    page_22x34_input_portrait = ws_inputs["B22"].value
+    if page_22x34_input_portrait.upper() == 'Y':
+        page_22x34_portrait = True    
+        
+        page_22x34_scenario_name_portrait = ws_inputs["F22"].value
+        if page_22x34_scenario_name_portrait is None:
+            raise Exception("Scenario needs to be selected.")
+
+    elif page_22x34_input_portrait.upper() == 'N':
+        page_22x34_portrait = False 
     else:
         raise Exception("Something went wrong if this error shows up.")
     
@@ -1137,15 +1151,19 @@ if indiv_int_by_scenario:
     print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
         "{'Figures_Individual_Int_By_Scenario.xlsx'}" \nOpening Excel file...')
 
-if page_22x34:
+if page_22x34_landscape:
     
-    ws_inputs_22x34 = wb_inputs["22x34_Layout"]
+    ws_inputs_22x34 = wb_inputs["22x34_Layout_Landscape"]
 
     # List out the unique scenarios present in the data merge file.
     unique_scenarios = df['Scenario'].unique()      
 
     # If the inputted 22x34 scenario is contained within the list of unique scenarios...
-    if page_22x34_scenario_name in unique_scenarios:
+    if page_22x34_scenario_name_landscape in unique_scenarios:
+
+        df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name_landscape]
+        progress = 0
+        progress_i = 1 / len(df_scenario.index)
 
         # Create the Excel workbook. 
         wb = Workbook()
@@ -1160,21 +1178,21 @@ if page_22x34:
         root.withdraw()
 
         # Determine the non-empty pages. 
-        input_pages = ['A96', 'FB96', 'LC96', 'A197', 'FB197', 'LC197', 'A298', 'FB298', 'LC298']
+        input_pages = ['A96', 'FE96', 'LI96', 'A197', 'FE197', 'LI197', 'A298', 'FE298', 'LI298']
         nonempty_pages = []
         for page in input_pages: 
             if ws_inputs_22x34[page].value == "NOT EMPTY":
                 nonempty_pages.append(page)
 
         if len(nonempty_pages) == 0:
-            print("WARNING: No intersections have been assigned to 22x34_Layout")
+            print("WARNING: No intersections have been assigned to 22x34_Layout_Landscape")
 
         # For each page, determine the filled-in intersection and populate in new spreadsheet.
         page_num = 1
         page_name = 'Page ' + str(page_num)
         for page in nonempty_pages:
-            print(page_name)
-            print(page)
+            # print(page_name)
+            # print(page)
             ws = wb.create_sheet(page_name)
             ws.sheet_view.zoomScale = 55
             ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
@@ -1201,23 +1219,12 @@ if page_22x34:
                     base_slot = relativeToCell(page, [('up', 31), ('right', 2)])
                     input_slot = relativeToCell(base_slot, [('up', 30 * v), ('right', 26 * h)])
                     if ws_inputs_22x34[input_slot].value is not None:
-                        if page_num == 1:
-                            print('Page 1 if path triggered')
-                            int_slots[ws_inputs_22x34[input_slot].value] = input_slot
-                        else:
-                            print('Else not Page 1 if path triggered')
-                            offset_base_slot = relativeToCell(input_pages[0], [('up', 31), ('right', 2)])
-                            offset_input_slot = relativeToCell(offset_base_slot, [('up', 30 * v), ('right', 26 * h)])
-                            int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
+                        offset_base_slot = relativeToCell(input_pages[0], [('up', 31), ('right', 2)])
+                        offset_input_slot = relativeToCell(offset_base_slot, [('up', 30 * v), ('right', 26 * h)])
+                        int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
             
-            print('int_slots')
-            print(int_slots)
-            
-
-            df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name]
-
-            progress = 0
-            progress_i = 1 / len(df_scenario.index)
+            # print('int_slots')
+            # print(int_slots)
 
             # for i in range(len(df_scenario.index)):
             #     int_number = df_scenario.loc[i, 'Int. ID 1']
@@ -1234,29 +1241,149 @@ if page_22x34:
                     populateFigure(ws, df_scenario, i, slot_address)
 
                     progress = progress + progress_i
-                    print(str(round(progress * 100)) + '% complete for 22x34 Layout! (' + str(page_name) + ')' )
+                    print(str(round(progress * 100)) + '% complete for 22x34 Layout Landscape! (' + str(page_name) + ')' )
 
             page_num = page_num + 1
             page_name = 'Page ' + str(page_num)
 
         # Remove the default 'Sheet' worksheet and save the workbook. 
         wb.remove(wb['Sheet'])
-        wb.save(fr'{application_path}\Figures_22x34_Layout.xlsx')
+        wb.save(fr'{application_path}\Figures_22x34_Layout_Landscape.xlsx')
 
         # Open the file. 
-        os.system(f"start EXCEL.EXE {'Figures_22x34_Layout.xlsx'}")
+        os.system(f"start EXCEL.EXE {'Figures_22x34_Layout_Landscape.xlsx'}")
         print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
-            "{'Figures_22x34_Layout.xlsx'}" \nOpening Excel file...')
+            "{'Figures_22x34_Layout_Landscape.xlsx'}" \nOpening Excel file...')
 
         """
-        ws = wb.create_sheet(page_22x34_scenario_name)
+        ws = wb.create_sheet(page_22x34_scenario_name_landscape)
         ws.sheet_view.zoomScale = 55
 
         # Set the column widths. 
         setColumnWidths(ws, 2.6)
         """
+
+        print('Desired Scenario is ' + page_22x34_scenario_name_landscape +'\n')
+
+    if page_22x34_portrait:
     
-    print('Desired Scenario is ' + page_22x34_scenario_name)
+        ws_inputs_22x34 = wb_inputs["22x34_Layout_Portrait"]
+
+        # List out the unique scenarios present in the data merge file.
+        unique_scenarios = df['Scenario'].unique()      
+
+        # If the inputted 22x34 scenario is contained within the list of unique scenarios...
+        if page_22x34_scenario_name_portrait in unique_scenarios:
+
+            df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name_portrait]
+            progress = 0
+            progress_i = 1 / len(df_scenario.index)
+
+            # Create the Excel workbook. 
+            wb = Workbook()
+
+            # Get the current script directory. 
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+
+            # Reference _data merge.csv into the dataframe. 
+
+            # Hide the root window.
+            root = tk.Tk()
+            root.withdraw()
+
+            # Determine the non-empty pages. 
+            input_pages = ['B2', 'CY2', 'GV2', 'KS2', 'OP2', 'SM2', 'B164', 'CY164', 'GV164', 'KS164', 'OOP164', 'SM164']
+            nonempty_pages = []
+            for page in input_pages: 
+                if ws_inputs_22x34[page].value == "NOT EMPTY":
+                    nonempty_pages.append(page)
+            
+            # print('nonempty:')
+            # print(nonempty_pages)
+
+            if len(nonempty_pages) == 0:
+                print("WARNING: No intersections have been assigned to 22x34_Layout_Portrait")
+
+            # For each page, determine the filled-in intersection and populate in new spreadsheet.
+            page_num = 1
+            page_name = 'Page ' + str(page_num)
+            for page in nonempty_pages:
+                # print(page_name)
+                # print(page)
+                ws = wb.create_sheet(page_name)
+                ws.sheet_view.zoomScale = 55
+                ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+
+                            
+                ws.page_setup.paperSize = 0  # 0 indicates custom paper size
+                ws.page_setup.paperWidth = "22in"  # 34 inches * 72 points
+                ws.page_setup.paperHeight = "34in"  # 22 inches * 72 points
+
+
+                # ws.page_setup.paperWidth = "22in"
+                # ws.page_setup.paperHeight = "34in"
+
+                # Set the column widths. 
+                setColumnWidths(ws, 2.6)
+
+                int_slots = {}
+                vert_offset = [0, 1, 2, 3, 4]
+                hori_offset = [0, 1, 2]
+
+                # Create a dictionary with int numbers as the key and cell addresses as the value 
+                for h in hori_offset: 
+                    for v in vert_offset: 
+                        base_slot = relativeToCell(page, [('down', 9), ('right', 13)])
+                        input_slot = relativeToCell(base_slot, [('down', 30 * v), ('right', 26 * h)])
+                        if ws_inputs_22x34[input_slot].value is not None:
+                                offset_base_slot = relativeToCell(input_pages[0], [('down', 9), ('right', 13)])
+                                offset_input_slot = relativeToCell(offset_base_slot, [('down', 30 * v), ('right', 26 * h)])
+                                int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
+                
+                # print('int_slots')
+                # print(int_slots)
+
+                # for i in range(len(df_scenario.index)):
+                #     int_number = df_scenario.loc[i, 'Int. ID 1']
+                #     slot_address = int_slots[int_number]
+                #     generateFigure(ws, df, i, slot_address)
+                #     populateFigure(ws, df, i, slot_address)
+
+                for i in range(len(df_scenario.index)):
+
+                    int_number = df.loc[i, 'Int. ID 1']
+                    if int_number in int_slots:
+                        slot_address = int_slots[int_number]
+                        # print('i : ' + str(i))
+                        # print('int_number : ' + str(int_number))
+                        # print('slot_address: ' + slot_address)
+                        generateFigure(ws, df_scenario, i, slot_address)
+                        populateFigure(ws, df_scenario, i, slot_address)
+
+                        progress = progress + progress_i
+                        print(str(round(progress * 100)) + '% complete for 22x34 Layout Portrait! (' + str(page_name) + ')' )
+
+                page_num = page_num + 1
+                page_name = 'Page ' + str(page_num)
+
+            # Remove the default 'Sheet' worksheet and save the workbook. 
+            wb.remove(wb['Sheet'])
+            wb.save(fr'{application_path}\Figures_22x34_Layout_Portrait.xlsx')
+
+            # Open the file. 
+            os.system(f"start EXCEL.EXE {'Figures_22x34_Layout_Portrait.xlsx'}")
+            print(f'\nYour Excel file has been processed and saved to the following directory: \n \
+                "{'Figures_22x34_Layout_Portrait.xlsx'}" \nOpening Excel file...')
+
+            """
+            ws = wb.create_sheet(page_22x34_scenario_name_portrait)
+            ws.sheet_view.zoomScale = 55
+
+            # Set the column widths. 
+            setColumnWidths(ws, 2.6)
+            """
+    
+        print('Desired Scenario is ' + page_22x34_scenario_name_portrait + '\n')
     
 
 
