@@ -625,6 +625,140 @@ def importVolumes(ws, df, df_row, origin, travel_dir):
             # Move to where the next southbound lane volume should be imported. 
             lane_coord = relativeToCell(lane_coord, [('left', 1)])
 
+def importLaneGeomArrowsOnly(ws, df, df_row, origin, travel_dir):
+    '''
+    PURPOSE/DESCRIPTION: A derivative of the importVolumes function, this will import lane geometry arrows into a figure based on intersection and travel direction. 
+    It's essentially the importVolumes function without the volume stuff. Note that this currently assumes that the turn arrow imagery are image files with
+    an extension of three letters (e.g., .png, .jpg, etc.). This code will not work if the file extension is not exactly three letters long (e.g., potentially .jpeg). 
+
+    INPUT: 
+    ws (Worksheet): The worksheet on which to import the volumes onto. 
+    df (Dataframe): The Pandas dataframe on which the data is being pulled from. 
+    df_row (Dataframe row): A row in the Pandas dataframe corresponding to the intersection to which a figure should be generated. 
+    origin (String): The cell address defining the "origin" of the figure that most figure creation processes refer off of. Top-left cell of figure. 
+    travel_dir (String): One of the following: "NB", "SB", "EB", or "WB". Denotes which travel direction volumes are to be imported. More can be added into the code. 
+
+    OUTPUT: 
+    N/A.
+    '''
+    # Shorten the variable names. 
+    height = main_display_height
+    width = main_display_width
+
+    # Create the lane names by appending the direction of travel (e.g., 'NB' or 'SB') with the lane number (a number from 1 through 6, inclusive).
+    lanes = []
+    for i in range(1,7):
+        lanes.append(travel_dir + str(i))
+
+    # Determine where to start importing the arrows in relation to the figure origin cell (top-left cell) based on direction of travel by choosing the appropriate translation list. 
+    if travel_dir == 'EB':
+        translation_list = [('down', int(height/2 + 3)), ('right', int(width/2 - 4))]
+    elif travel_dir == 'NB':
+        translation_list = [('down', int(height/2 + 3)), ('right', int(width/2 + 4))]
+    elif travel_dir == 'WB':
+        translation_list = [('down', int(height/2 - 3)), ('right', int(width/2 + 3))]
+    elif travel_dir == 'SB':
+        translation_list = [('down', int(height/2 - 4)), ('right', int(width/2 - 4))]
+
+    # Modify the translation list to account for the header, if it exists. 
+    if header:
+        translation_list.append(('down', header_height))
+
+    # With the chosen translation list, determine where to start importing the volumes in based on direction of travel. 
+    lane_coord = relativeToCell(origin, translation_list)
+
+    # For each lane of the six total lanes for that direction...
+    for lane_num in lanes: 
+
+        # *** THIS IS A DEBUG CODE BLOCK ***
+        # print(df.loc[df_row, 'Scenario'] + ' ' + lane_num)
+        # print(df.loc[df_row, lane_num])
+        # *** THIS IS A DEBUG CODE BLOCK ***
+
+        # Create the strings that will be used in searching the dataframe for the turn arrows needed and put into a list. 
+        lane_arrows = []
+        for i in range(0,3):
+            lane_arrows.append('@image_' + lane_num + '.' + str(i))
+
+        # COMMENTING OUT THE VOLUME ASPECT OF THIS importVolumes FUNCTION DERIVATIVE
+        # Locate the volume belonging to lane_num and write it into the worksheet at lane_coord. 
+        # ws[lane_coord] = df.loc[df_row, lane_num]
+        
+        # If the direction of travel is eastbound, determine and insert the appropriate eastbound turn arrows, as well as format. 
+        if travel_dir == 'EB':
+            ws[lane_coord].alignment = Alignment(horizontal='right', vertical='center')
+            lane_arrow_coord = relativeToCell(lane_coord, [('right', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImageWithOffset(ws, lane_arrow_coord, img_dir_path, img_file_name, 0, 30, 30, 0.20, -0.30)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
+            # Move to where the next eastbound lane arrow should be imported. 
+            lane_coord = relativeToCell(lane_coord, [('down', 1)])  
+
+        # If the direction of travel is northbound, determine and insert the appropriate northbound turn arrows, as well as format. 
+        elif travel_dir == 'NB':
+            cells_to_merge_nb = lane_coord + ":" + relativeToCell(lane_coord, [('down', int(height/2)-5)])
+            ws.merge_cells(cells_to_merge_nb)
+            ws[lane_coord].alignment = Alignment(textRotation=90, horizontal='center', vertical='top')
+            lane_arrow_coord = relativeToCell(lane_coord, [('up', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImageWithOffset(ws, lane_arrow_coord, img_dir_path, img_file_name, 90, 30, 30, -0.45, -0.65)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
+            # Move to where the next northbound lane arrow should be imported. 
+            lane_coord = relativeToCell(lane_coord, [('right', 1)])
+
+        # If the direction of travel is westbound, determine and insert the appropriate westbound turn arrows, as well as format. 
+        elif travel_dir == 'WB':
+            ws[lane_coord].alignment = Alignment(horizontal='left', vertical='center')
+            lane_arrow_coord = relativeToCell(lane_coord, [('left', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImageWithOffset(ws, lane_arrow_coord, img_dir_path, img_file_name, 180, 30, 30, -0.80, -0.15)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
+            # Move to where the next westbound lane arrow should be imported. 
+            lane_coord = relativeToCell(lane_coord, [('up', 1)])
+
+        # If the direction of travel is southbound, determine and insert the appropriate southbound turn arrows, as well as format. Southbound has a special case of doing ws[lane_coord] = df.loc[df_row, lane_num]
+        # because of the cell addresses of merged cells. The original ws[lane_coord] = df.loc[df_row, lane_num] assignment to the worksheet is wiped away when the cell was merged, I believe. 
+        elif travel_dir == 'SB':
+            cells_to_merge_sb = relativeToCell(lane_coord, [('up', int(height/2)-5)]) + ":" + lane_coord
+            ws.merge_cells(cells_to_merge_sb)
+            lane_coord_sb_merged = relativeToCell(lane_coord, [('up', int(height/2)-5)])
+            ws[lane_coord_sb_merged].alignment = Alignment(textRotation=90, horizontal='center', vertical='bottom')
+            #ws[lane_coord_sb_merged] = df.loc[df_row, lane_num] #Commented out because this adds the volume
+            lane_arrow_coord = relativeToCell(lane_coord, [('down', 1)])
+            for arrow in lane_arrows:
+                try: 
+                    img_file_name = df.loc[df_row, arrow]
+                    img_file_name = img_file_name[:-3] + 'png'
+                    insertImageWithOffset(ws, lane_arrow_coord, img_dir_path, img_file_name, 270, 30, 30, -0.25, 0.20)
+                except IndexError:
+                    dummy = 'do nothing'
+                except TypeError:
+                    dummy = 'do nothing'
+
+            # Move to where the next southbound lane arrow should be imported. 
+            lane_coord = relativeToCell(lane_coord, [('left', 1)])
+
 def insertImage(ws, coord, img_path, img_name, rotation, img_height, img_width):
     '''
     PURPOSE/DESCRIPTION: Inserts an image into the worksheet without the option for offsets (i.e., the top-left corner of the image
@@ -728,7 +862,7 @@ def insertImageWithOffset(ws, coord, img_path, img_name, rotation, img_height, i
     ws.add_image(img) 
     return None
 
-def populateFigure(ws, df, df_row, origin):
+def populateFigure(ws, df, df_row, origin, vols):
     '''
     PURPOSE/DESCRIPTION: Populates the figures with volumes, names, etc. 
 
@@ -737,6 +871,7 @@ def populateFigure(ws, df, df_row, origin):
     df (Dataframe): The Pandas dataframe to be used to pull information from. 
     df_row (Dataframe row): A row in the Pandas dataframe corresponding to the intersection to which a figure should be generated. 
     origin (String): The cell address defining the "origin" of the figure that most figure creation processes refer off of. Top-left cell of figure. 
+    vols (Boolean): Populate volumes (true or false).
 
     OUTPUT: 
     N/A.
@@ -798,10 +933,16 @@ def populateFigure(ws, df, df_row, origin):
     ws[nb_roadname_topleft_cell].alignment = Alignment(textRotation=90, vertical='bottom')
 
     # Import the volumes for all four directions. 
-    importVolumes(ws, df, df_row, origin, 'EB')
-    importVolumes(ws, df, df_row, origin, 'NB')
-    importVolumes(ws, df, df_row, origin, 'WB')
-    importVolumes(ws, df, df_row, origin, 'SB')
+    if vols:
+        importVolumes(ws, df, df_row, origin, 'EB')
+        importVolumes(ws, df, df_row, origin, 'NB')
+        importVolumes(ws, df, df_row, origin, 'WB')
+        importVolumes(ws, df, df_row, origin, 'SB')
+    else: 
+        importLaneGeomArrowsOnly(ws, df, df_row, origin, 'EB')
+        importLaneGeomArrowsOnly(ws, df, df_row, origin, 'NB')
+        importLaneGeomArrowsOnly(ws, df, df_row, origin, 'WB')
+        importLaneGeomArrowsOnly(ws, df, df_row, origin, 'SB')
 
     # NEED TO INSERT LOGIC FOR NO STREET NAMES, NAN IS COMING OUT AS FLOAT
     if header:
@@ -872,10 +1013,13 @@ def isValidHexaCode(input_str):
             return False
  
     return True
+    
 
     
 '''
+*********************************************************************
 ****************** EXECUTING THE MAIN SCRIPT BELOW ******************
+*********************************************************************
 '''
 # Open file dialog
 csv_path = filedialog.askopenfilename(title="Select Data Merge File", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
@@ -890,6 +1034,7 @@ main_display_height = 26    # Would recommend keeping this value. Recommend at l
 main_display_width = 24     # Would recommend keeping this value. Recommend at least even number (code may not work well for odd) and at least 24. 
 
 # If the following boolean is set to true, then the code will read from Inputs.xlsx. Otherwise, the code will prompt the user via command line for inputs. 
+# Noting that the command line inputs "if" statement is not being kept current and may be extremely out of date / not work entirely. 
 xlsx_inputs = True
 
 if not xlsx_inputs:
@@ -981,6 +1126,7 @@ if not xlsx_inputs:
         THE INDIVIDUAL PLOTTING OF INTERSECTIONS BY SCENARIO INTO AN EXCEL FILE.
     """
 else:
+    
     wb_inputs = openpyxl.load_workbook("./Inputs.xlsm", read_only=True, data_only=True)
     ws_inputs = wb_inputs["Inputs"]
 
@@ -1024,21 +1170,67 @@ else:
     else:
         raise Exception("Something went wrong if this error shows up.")
     
+    # Obtain user input for Kimley-Horn logo to use (KH, KHNY, KHMI, KHDC).
+    logo_input = ws_inputs["B14"].value
+
+    # Obtain user input for project name
+    project_name_input = ws_inputs["B16"].value
+
+    # Obtain user input for project name
+    figure_name_input = ws_inputs["B18"].value
+
+    # Obtain user input for individual intersection lane geometry printing by scenario (yes or no).
+    indiv_lane_geom_by_scenario_input = ws_inputs["B26"].value
+    if indiv_lane_geom_by_scenario_input.upper() == 'Y':
+        indiv_lane_geom_by_scenario = True    
+    elif indiv_lane_geom_by_scenario_input.upper() == 'N':
+        indiv_lane_geom_by_scenario = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+
+    # Obtain user input for plotting 22x34 lane geometry on landscape (yes or no).
+    page_22x34_input_landscape_lane_geom = ws_inputs["B28"].value
+    if page_22x34_input_landscape_lane_geom.upper() == 'Y':
+        page_22x34_landscape_lane_geom = True    
+        
+        page_22x34_scenario_name_landscape_lane_geom = ws_inputs["F28"].value
+        if page_22x34_scenario_name_landscape_lane_geom is None:
+            raise Exception("Scenario needs to be selected.")
+
+    elif page_22x34_input_landscape_lane_geom.upper() == 'N':
+        page_22x34_landscape_lane_geom = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
+    # Obtain user input for plotting 22x34 lane geometry on portrait (yes or no).
+    page_22x34_input_portrait_lane_geom = ws_inputs["B29"].value
+    if page_22x34_input_portrait_lane_geom.upper() == 'Y':
+        page_22x34_portrait_lane_geom = True    
+        
+        page_22x34_scenario_name_portrait_lane_geom = ws_inputs["F29"].value
+        if page_22x34_scenario_name_portrait_lane_geom is None:
+            raise Exception("Scenario needs to be selected.")
+
+    elif page_22x34_input_portrait_lane_geom.upper() == 'N':
+        page_22x34_portrait_lane_geom = False 
+    else:
+        raise Exception("Something went wrong if this error shows up.")
+    
     # Obtain user input for individual intersection printing by scenario (yes or no).
-    indiv_int_by_scenario_input = ws_inputs["B19"].value
+    indiv_int_by_scenario_input = ws_inputs["B33"].value
     if indiv_int_by_scenario_input.upper() == 'Y':
         indiv_int_by_scenario = True    
     elif indiv_int_by_scenario_input.upper() == 'N':
         indiv_int_by_scenario = False 
     else:
         raise Exception("Something went wrong if this error shows up.")
-
+    
     # Obtain user input for 22x34 page printing landscape (yes or no).
-    page_22x34_input_landscape = ws_inputs["B21"].value
+    page_22x34_input_landscape = ws_inputs["B35"].value
     if page_22x34_input_landscape.upper() == 'Y':
         page_22x34_landscape = True    
         
-        page_22x34_scenario_name_landscape = ws_inputs["F21"].value
+        page_22x34_scenario_name_landscape = ws_inputs["F35"].value
         if page_22x34_scenario_name_landscape is None:
             raise Exception("Scenario needs to be selected.")
 
@@ -1048,11 +1240,11 @@ else:
         raise Exception("Something went wrong if this error shows up.")
     
     # Obtain user input for 22x34 page printing portrait (yes or no).
-    page_22x34_input_portrait = ws_inputs["B22"].value
+    page_22x34_input_portrait = ws_inputs["B36"].value
     if page_22x34_input_portrait.upper() == 'Y':
         page_22x34_portrait = True    
         
-        page_22x34_scenario_name_portrait = ws_inputs["F22"].value
+        page_22x34_scenario_name_portrait = ws_inputs["F36"].value
         if page_22x34_scenario_name_portrait is None:
             raise Exception("Scenario needs to be selected.")
 
@@ -1136,7 +1328,7 @@ if indiv_int_by_scenario:
                 # Set the local figure origin to the origin column and current row, then generate and populate the figure, and move curr_row to where the next figure will be created.
                 local_fig_origin = origin_col + str(curr_row)
                 generateFigure(ws, df, i, local_fig_origin)
-                populateFigure(ws, df, i, local_fig_origin)
+                populateFigure(ws, df, i, local_fig_origin, True)
                 curr_row = curr_row + jump
 
                 progress = progress + progress_i
@@ -1148,6 +1340,7 @@ if indiv_int_by_scenario:
 
     # Open the file. 
     os.system(f"start EXCEL.EXE {'Figures_Individual_Int_By_Scenario.xlsx'}")
+    
     print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
         "{'Figures_Individual_Int_By_Scenario.xlsx'}" \nOpening Excel file...')
 
@@ -1237,11 +1430,54 @@ if page_22x34_landscape:
                 int_number = df.loc[i, 'Int. ID 1']
                 if int_number in int_slots:
                     slot_address = int_slots[int_number]
+                    slot_address = relativeToCell(slot_address, [('up', 3), ('left', 1)])
+
                     generateFigure(ws, df_scenario, i, slot_address)
-                    populateFigure(ws, df_scenario, i, slot_address)
+                    populateFigure(ws, df_scenario, i, slot_address, True)
 
                     progress = progress + progress_i
                     print(str(round(progress * 100)) + '% complete for 22x34 Layout Landscape! (' + str(page_name) + ')' )
+
+            # Create page border
+            createThickOutsideBorders(ws, 'A1', 'EZ90')
+            createThickOutsideBorders(ws, 'A91', 'AK98')
+            createThickOutsideBorders(ws, 'AL91', 'CP98')
+            createThickOutsideBorders(ws, 'CQ91', 'ER98')
+            createThickOutsideBorders(ws, 'ES91', 'EZ92')
+            createThickOutsideBorders(ws, 'ES93', 'EZ98')
+
+            # Merge the "TITLE BLOCK" cells together
+            ws.merge_cells("AL91:CP98")
+            ws.merge_cells("CQ91:ER98")
+            ws.merge_cells("ES91:EZ92")
+            ws.merge_cells("ES93:EZ98")
+
+            # Determine which logo the user selected
+            if logo_input == 'KH':
+                insertImageWithOffset(ws, 'C92', '.\\KH Logos\\', 'KH_Logo.jpg', 0, 30*4, 30*20, 0, 0)
+            elif logo_input == 'KHNY':
+                insertImageWithOffset(ws, 'C91', '.\\KH Logos\\', 'KHNY_Logo.jpg', 0, 30*4.5, 30*20, 0, 0.25)
+            elif logo_input == 'KHMI': 
+                insertImageWithOffset(ws, 'D91', '.\\KH Logos\\', 'KHMI_Logo.jpg', 0, 30*4.5, 30*19, 0, 0.25)
+            elif logo_input == 'KHDC':
+                insertImageWithOffset(ws, 'A92', '.\\KH Logos\\', 'KHDC_Logo.jpg', 0, 30*4, 30*22, 0.5, 0)
+
+            # Format and fill in the TITLE BLOCK text
+            ws['AL91'].value = project_name_input
+            ws['AL91'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['AL91'].font = Font(size=40)
+
+            ws['CQ91'].value = figure_name_input
+            ws['CQ91'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['CQ91'].font = Font(size=40)
+            
+            ws['ES91'].value = "FIGURE"
+            ws['ES91'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['ES91'].font = Font(size=28, bold=True)
+
+            ws['ES93'].value = page_num
+            ws['ES93'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['ES93'].font = Font(size=72)
 
             page_num = page_num + 1
             page_name = 'Page ' + str(page_num)
@@ -1265,126 +1501,454 @@ if page_22x34_landscape:
 
         print('Desired Scenario is ' + page_22x34_scenario_name_landscape +'\n')
 
-    if page_22x34_portrait:
-    
-        ws_inputs_22x34 = wb_inputs["22x34_Layout_Portrait"]
+if page_22x34_portrait:
 
-        # List out the unique scenarios present in the data merge file.
-        unique_scenarios = df['Scenario'].unique()      
+    ws_inputs_22x34 = wb_inputs["22x34_Layout_Portrait"]
 
-        # If the inputted 22x34 scenario is contained within the list of unique scenarios...
-        if page_22x34_scenario_name_portrait in unique_scenarios:
+    # List out the unique scenarios present in the data merge file.
+    unique_scenarios = df['Scenario'].unique()      
 
-            df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name_portrait]
-            progress = 0
-            progress_i = 1 / len(df_scenario.index)
+    # If the inputted 22x34 scenario is contained within the list of unique scenarios...
+    if page_22x34_scenario_name_portrait in unique_scenarios:
 
-            # Create the Excel workbook. 
-            wb = Workbook()
+        df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name_portrait]
+        progress = 0
+        progress_i = 1 / len(df_scenario.index)
 
-            # Get the current script directory. 
-            script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Create the Excel workbook. 
+        wb = Workbook()
 
-            # Reference _data merge.csv into the dataframe. 
+        # Get the current script directory. 
+        script_dir = os.path.dirname(os.path.abspath(__file__))
 
-            # Hide the root window.
-            root = tk.Tk()
-            root.withdraw()
+        # Reference _data merge.csv into the dataframe. 
 
-            # Determine the non-empty pages. 
-            input_pages = ['B2', 'CY2', 'GV2', 'KS2', 'OP2', 'SM2', 'B164', 'CY164', 'GV164', 'KS164', 'OOP164', 'SM164']
-            nonempty_pages = []
-            for page in input_pages: 
-                if ws_inputs_22x34[page].value == "NOT EMPTY":
-                    nonempty_pages.append(page)
-            
-            # print('nonempty:')
-            # print(nonempty_pages)
+        # Hide the root window.
+        root = tk.Tk()
+        root.withdraw()
 
-            if len(nonempty_pages) == 0:
-                print("WARNING: No intersections have been assigned to 22x34_Layout_Portrait")
+        # Determine the non-empty pages. 
+        input_pages = ['B2', 'CY2', 'GV2', 'KS2', 'OP2', 'SM2', 'B164', 'CY164', 'GV164', 'KS164', 'OP164', 'SM164']
+        nonempty_pages = []
+        for page in input_pages: 
+            if ws_inputs_22x34[page].value == "NOT EMPTY":
+                nonempty_pages.append(page)
+        
+        # print('nonempty:')
+        # print(nonempty_pages)
 
-            # For each page, determine the filled-in intersection and populate in new spreadsheet.
-            page_num = 1
-            page_name = 'Page ' + str(page_num)
-            for page in nonempty_pages:
-                # print(page_name)
-                # print(page)
-                ws = wb.create_sheet(page_name)
-                ws.sheet_view.zoomScale = 55
-                ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+        if len(nonempty_pages) == 0:
+            print("WARNING: No intersections have been assigned to 22x34_Layout_Portrait")
 
-                            
-                ws.page_setup.paperSize = 0  # 0 indicates custom paper size
-                ws.page_setup.paperWidth = "22in"  # 34 inches * 72 points
-                ws.page_setup.paperHeight = "34in"  # 22 inches * 72 points
-
-
-                # ws.page_setup.paperWidth = "22in"
-                # ws.page_setup.paperHeight = "34in"
-
-                # Set the column widths. 
-                setColumnWidths(ws, 2.6)
-
-                int_slots = {}
-                vert_offset = [0, 1, 2, 3, 4]
-                hori_offset = [0, 1, 2]
-
-                # Create a dictionary with int numbers as the key and cell addresses as the value 
-                for h in hori_offset: 
-                    for v in vert_offset: 
-                        base_slot = relativeToCell(page, [('down', 9), ('right', 13)])
-                        input_slot = relativeToCell(base_slot, [('down', 30 * v), ('right', 26 * h)])
-                        if ws_inputs_22x34[input_slot].value is not None:
-                                offset_base_slot = relativeToCell(input_pages[0], [('down', 9), ('right', 13)])
-                                offset_input_slot = relativeToCell(offset_base_slot, [('down', 30 * v), ('right', 26 * h)])
-                                int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
-                
-                # print('int_slots')
-                # print(int_slots)
-
-                # for i in range(len(df_scenario.index)):
-                #     int_number = df_scenario.loc[i, 'Int. ID 1']
-                #     slot_address = int_slots[int_number]
-                #     generateFigure(ws, df, i, slot_address)
-                #     populateFigure(ws, df, i, slot_address)
-
-                for i in range(len(df_scenario.index)):
-
-                    int_number = df.loc[i, 'Int. ID 1']
-                    if int_number in int_slots:
-                        slot_address = int_slots[int_number]
-                        # print('i : ' + str(i))
-                        # print('int_number : ' + str(int_number))
-                        # print('slot_address: ' + slot_address)
-                        generateFigure(ws, df_scenario, i, slot_address)
-                        populateFigure(ws, df_scenario, i, slot_address)
-
-                        progress = progress + progress_i
-                        print(str(round(progress * 100)) + '% complete for 22x34 Layout Portrait! (' + str(page_name) + ')' )
-
-                page_num = page_num + 1
-                page_name = 'Page ' + str(page_num)
-
-            # Remove the default 'Sheet' worksheet and save the workbook. 
-            wb.remove(wb['Sheet'])
-            wb.save(fr'{application_path}\Figures_22x34_Layout_Portrait.xlsx')
-
-            # Open the file. 
-            os.system(f"start EXCEL.EXE {'Figures_22x34_Layout_Portrait.xlsx'}")
-            print(f'\nYour Excel file has been processed and saved to the following directory: \n \
-                "{'Figures_22x34_Layout_Portrait.xlsx'}" \nOpening Excel file...')
-
-            """
-            ws = wb.create_sheet(page_22x34_scenario_name_portrait)
+        # For each page, determine the filled-in intersection and populate in new spreadsheet.
+        page_num = 1
+        page_name = 'Page ' + str(page_num)
+        for page in nonempty_pages:
+            # print(page_name)
+            # print(page)
+            ws = wb.create_sheet(page_name)
             ws.sheet_view.zoomScale = 55
+            ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+
+                        
+            ws.page_setup.paperSize = 0  # 0 indicates custom paper size
+            ws.page_setup.paperWidth = "22in"  # 34 inches * 72 points
+            ws.page_setup.paperHeight = "34in"  # 22 inches * 72 points
+
+
+            # ws.page_setup.paperWidth = "22in"
+            # ws.page_setup.paperHeight = "34in"
 
             # Set the column widths. 
             setColumnWidths(ws, 2.6)
-            """
+
+            int_slots = {}
+            vert_offset = [0, 1, 2, 3, 4]
+            hori_offset = [0, 1, 2]
+
+            # Create a dictionary with int numbers as the key and cell addresses as the value 
+            for h in hori_offset: 
+                for v in vert_offset: 
+                    base_slot = relativeToCell(page, [('down', 9), ('right', 13)])
+                    input_slot = relativeToCell(base_slot, [('down', 30 * v), ('right', 26 * h)])
+                    if ws_inputs_22x34[input_slot].value is not None:
+                            offset_base_slot = relativeToCell(input_pages[0], [('down', 9), ('right', 13)])
+                            offset_input_slot = relativeToCell(offset_base_slot, [('down', 30 * v), ('right', 26 * h)])
+                            int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
+            
+            # print('int_slots')
+            # print(int_slots)
+
+            # for i in range(len(df_scenario.index)):
+            #     int_number = df_scenario.loc[i, 'Int. ID 1']
+            #     slot_address = int_slots[int_number]
+            #     generateFigure(ws, df, i, slot_address)
+            #     populateFigure(ws, df, i, slot_address)
+
+            for i in range(len(df_scenario.index)):
+
+                int_number = df.loc[i, 'Int. ID 1']
+                if int_number in int_slots:
+                    slot_address = int_slots[int_number]
+                    # print('i : ' + str(i))
+                    # print('int_number : ' + str(int_number))
+                    # print('slot_address: ' + slot_address)
+                    generateFigure(ws, df_scenario, i, slot_address)
+                    populateFigure(ws, df_scenario, i, slot_address, True)
+
+                    progress = progress + progress_i
+                    print(str(round(progress * 100)) + '% complete for 22x34 Layout Portrait! (' + str(page_name) + ')' )
+
+            page_num = page_num + 1
+            page_name = 'Page ' + str(page_num)
+
+        # Remove the default 'Sheet' worksheet and save the workbook. 
+        wb.remove(wb['Sheet'])
+        wb.save(fr'{application_path}\Figures_22x34_Layout_Portrait.xlsx')
+
+        # Open the file. 
+        os.system(f"start EXCEL.EXE {'Figures_22x34_Layout_Portrait.xlsx'}")
+        print(f'\nYour Excel file has been processed and saved to the following directory: \n \
+            "{'Figures_22x34_Layout_Portrait.xlsx'}" \nOpening Excel file...')
+
+        """
+        ws = wb.create_sheet(page_22x34_scenario_name_portrait)
+        ws.sheet_view.zoomScale = 55
+
+        # Set the column widths. 
+        setColumnWidths(ws, 2.6)
+        """
+
+    print('Desired Scenario is ' + page_22x34_scenario_name_portrait + '\n')
     
-        print('Desired Scenario is ' + page_22x34_scenario_name_portrait + '\n')
+if indiv_lane_geom_by_scenario:
+
+    # Create the Excel workbook. 
+    wb = Workbook()
+
+    # Get the current script directory. 
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Reference _data merge.csv into the dataframe. 
+
+    # Hide the root window
+    root = tk.Tk()
+    root.withdraw()
+
+    # Determine all of the unique conditions scenarios, create a worksheet for each one, and set the zoom to 115%; update progress printing to terminal.
+    progress = 0
+    progress_i = 1 / len(df.index)
+    unique_scenarios = df['Scenario'].unique()
+    for scenario in unique_scenarios: 
+        ws = wb.create_sheet(scenario)
+        ws.sheet_view.zoomScale = 115
+
+        # Set the column widths. 
+        setColumnWidths(ws, 2.6)
+
+        # Split the origin's cell address (where to begin figure generation at) for ease of use and set curr_row to origin_row.  
+        origin_col, origin_row = splitCellCoord(origin)
+        curr_row = int(origin_row)
+
+        # For each row in the dataframe (a row represents one intersection under one scenario)...
+        for i in range(len(df.index)):
+            
+            # If the row is the scenario that we're currently iterating through...
+            if df.loc[i, 'Scenario'] == scenario:
+
+                # Set the local figure origin to the origin column and current row, then generate and populate the figure, and move curr_row to where the next figure will be created.
+                local_fig_origin = origin_col + str(curr_row)
+                generateFigure(ws, df, i, local_fig_origin)
+                populateFigure(ws, df, i, local_fig_origin, False)
+                curr_row = curr_row + jump
+
+                progress = progress + progress_i
+                print(str(round(progress * 100)) + '% complete for INDIVIDUAL LANE GEOMETRY FIGURES BY SCENARIO!')
+
+    # Remove the default 'Sheet' worksheet and save the workbook. 
+    wb.remove(wb['Sheet'])
+    wb.save(fr'{application_path}\Figures_Individual_LaneGeom_By_Scenario.xlsx')
+
+    # Open the file. 
+    os.system(f"start EXCEL.EXE {'Figures_Individual_LaneGeom_By_Scenario.xlsx'}")
     
+    print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
+        "{'Figures_Individual_LaneGeom_By_Scenario.xlsx'}" \nOpening Excel file...')
+
+if page_22x34_landscape_lane_geom:
+    
+    ws_inputs_22x34 = wb_inputs["22x34_Layout_Landscape"]
+
+    # List out the unique scenarios present in the data merge file.
+    unique_scenarios = df['Scenario'].unique()      
+
+    # If the inputted 22x34 scenario is contained within the list of unique scenarios...
+    if page_22x34_scenario_name_landscape_lane_geom in unique_scenarios:
+
+        df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name_landscape_lane_geom]
+        progress = 0
+        progress_i = 1 / len(df_scenario.index)
+
+        # Create the Excel workbook. 
+        wb = Workbook()
+
+        # Get the current script directory. 
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Reference _data merge.csv into the dataframe. 
+
+        # Hide the root window.
+        root = tk.Tk()
+        root.withdraw()
+
+        # Determine the non-empty pages. 
+        input_pages = ['A96', 'FE96', 'LI96', 'A197', 'FE197', 'LI197', 'A298', 'FE298', 'LI298']
+        nonempty_pages = []
+        for page in input_pages: 
+            if ws_inputs_22x34[page].value == "NOT EMPTY":
+                nonempty_pages.append(page)
+
+        if len(nonempty_pages) == 0:
+            print("WARNING: No intersections have been assigned to 22x34_Layout_Landscape")
+
+        # For each page, determine the filled-in intersection and populate in new spreadsheet.
+        page_num = 1
+        page_name = 'Page ' + str(page_num)
+        for page in nonempty_pages:
+            # print(page_name)
+            # print(page)
+            ws = wb.create_sheet(page_name)
+            ws.sheet_view.zoomScale = 55
+            ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+
+                        
+            ws.page_setup.paperSize = 0  # 0 indicates custom paper size
+            ws.page_setup.paperWidth = "34in"  # 34 inches * 72 points
+            ws.page_setup.paperHeight = "22in"  # 22 inches * 72 points
 
 
+            # ws.page_setup.paperWidth = "34in"
+            # ws.page_setup.paperHeight = "22in"
 
+            # Set the column widths. 
+            setColumnWidths(ws, 2.6)
+
+            int_slots = {}
+            vert_offset = [0, 1, 2]
+            hori_offset = [0, 1, 2, 3, 4, 5]
+
+            # Create a dictionary with int numbers as the key and cell addresses as the value 
+            for h in hori_offset: 
+                for v in vert_offset: 
+                    base_slot = relativeToCell(page, [('up', 31), ('right', 2)])
+                    input_slot = relativeToCell(base_slot, [('up', 30 * v), ('right', 26 * h)])
+                    if ws_inputs_22x34[input_slot].value is not None:
+                        offset_base_slot = relativeToCell(input_pages[0], [('up', 31), ('right', 2)])
+                        offset_input_slot = relativeToCell(offset_base_slot, [('up', 30 * v), ('right', 26 * h)])
+                        int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
+            
+            # print('int_slots')
+            # print(int_slots)
+
+            # for i in range(len(df_scenario.index)):
+            #     int_number = df_scenario.loc[i, 'Int. ID 1']
+            #     slot_address = int_slots[int_number]
+            #     generateFigure(ws, df, i, slot_address)
+            #     populateFigure(ws, df, i, slot_address)
+
+            for i in range(len(df_scenario.index)):
+
+                int_number = df.loc[i, 'Int. ID 1']
+                if int_number in int_slots:
+                    slot_address = int_slots[int_number]
+                    slot_address = relativeToCell(slot_address, [('up', 3), ('left', 1)])
+
+                    generateFigure(ws, df_scenario, i, slot_address)
+                    populateFigure(ws, df_scenario, i, slot_address, False)
+
+                    progress = progress + progress_i
+                    print(str(round(progress * 100)) + '% complete for 22x34 Layout Landscape - Lane Geometry! (' + str(page_name) + ')' )
+
+            # Create page border
+            createThickOutsideBorders(ws, 'A1', 'EZ90')
+            createThickOutsideBorders(ws, 'A91', 'AK98')
+            createThickOutsideBorders(ws, 'AL91', 'CP98')
+            createThickOutsideBorders(ws, 'CQ91', 'ER98')
+            createThickOutsideBorders(ws, 'ES91', 'EZ92')
+            createThickOutsideBorders(ws, 'ES93', 'EZ98')
+
+            # Merge the "TITLE BLOCK" cells together
+            ws.merge_cells("AL91:CP98")
+            ws.merge_cells("CQ91:ER98")
+            ws.merge_cells("ES91:EZ92")
+            ws.merge_cells("ES93:EZ98")
+
+            # Determine which logo the user selected
+            if logo_input == 'KH':
+                insertImageWithOffset(ws, 'C92', '.\\KH Logos\\', 'KH_Logo.jpg', 0, 30*4, 30*20, 0, 0)
+            elif logo_input == 'KHNY':
+                insertImageWithOffset(ws, 'C91', '.\\KH Logos\\', 'KHNY_Logo.jpg', 0, 30*4.5, 30*20, 0, 0.25)
+            elif logo_input == 'KHMI': 
+                insertImageWithOffset(ws, 'D91', '.\\KH Logos\\', 'KHMI_Logo.jpg', 0, 30*4.5, 30*19, 0, 0.25)
+            elif logo_input == 'KHDC':
+                insertImageWithOffset(ws, 'A92', '.\\KH Logos\\', 'KHDC_Logo.jpg', 0, 30*4, 30*22, 0.5, 0)
+
+            # Format and fill in the TITLE BLOCK text
+            ws['AL91'].value = project_name_input
+            ws['AL91'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['AL91'].font = Font(size=40)
+
+            ws['CQ91'].value = figure_name_input
+            ws['CQ91'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['CQ91'].font = Font(size=40)
+            
+            ws['ES91'].value = "FIGURE"
+            ws['ES91'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['ES91'].font = Font(size=28, bold=True)
+
+            ws['ES93'].value = page_num
+            ws['ES93'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws['ES93'].font = Font(size=72)
+
+            page_num = page_num + 1
+            page_name = 'Page ' + str(page_num)
+
+        # Remove the default 'Sheet' worksheet and save the workbook. 
+        wb.remove(wb['Sheet'])
+        wb.save(fr'{application_path}\Figures_22x34_Layout_LaneGeom_Landscape.xlsx')
+
+        # Open the file. 
+        os.system(f"start EXCEL.EXE {'Figures_22x34_Layout_LaneGeom_Landscape.xlsx'}")
+        print(f'\nYour outlook calendar has been processed and saved to the following directory: \n \
+            "{'Figures_22x34_Layout_LaneGeom_Landscape.xlsx'}" \nOpening Excel file...')
+
+        """
+        ws = wb.create_sheet(page_22x34_scenario_name_landscape)
+        ws.sheet_view.zoomScale = 55
+
+        # Set the column widths. 
+        setColumnWidths(ws, 2.6)
+        """
+
+        print('Desired Scenario is ' + page_22x34_scenario_name_landscape_lane_geom +'\n')
+
+if page_22x34_portrait_lane_geom:
+
+    ws_inputs_22x34 = wb_inputs["22x34_Layout_Portrait"]
+
+    # List out the unique scenarios present in the data merge file.
+    unique_scenarios = df['Scenario'].unique()      
+
+    # If the inputted 22x34 scenario is contained within the list of unique scenarios...
+    if page_22x34_scenario_name_portrait_lane_geom in unique_scenarios:
+
+        df_scenario = df.loc[df['Scenario'] == page_22x34_scenario_name_portrait_lane_geom]
+        progress = 0
+        progress_i = 1 / len(df_scenario.index)
+
+        # Create the Excel workbook. 
+        wb = Workbook()
+
+        # Get the current script directory. 
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Reference _data merge.csv into the dataframe. 
+
+        # Hide the root window.
+        root = tk.Tk()
+        root.withdraw()
+
+        # Determine the non-empty pages. 
+        input_pages = ['B2', 'CY2', 'GV2', 'KS2', 'OP2', 'SM2', 'B164', 'CY164', 'GV164', 'KS164', 'OP164', 'SM164']
+        nonempty_pages = []
+        for page in input_pages: 
+            if ws_inputs_22x34[page].value == "NOT EMPTY":
+                nonempty_pages.append(page)
+        
+        # print('nonempty:')
+        # print(nonempty_pages)
+
+        if len(nonempty_pages) == 0:
+            print("WARNING: No intersections have been assigned to 22x34_Layout_Portrait")
+
+        # For each page, determine the filled-in intersection and populate in new spreadsheet.
+        page_num = 1
+        page_name = 'Page ' + str(page_num)
+        for page in nonempty_pages:
+            # print(page_name)
+            # print(page)
+            ws = wb.create_sheet(page_name)
+            ws.sheet_view.zoomScale = 55
+            ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+
+                        
+            ws.page_setup.paperSize = 0  # 0 indicates custom paper size
+            ws.page_setup.paperWidth = "22in"  # 34 inches * 72 points
+            ws.page_setup.paperHeight = "34in"  # 22 inches * 72 points
+
+
+            # ws.page_setup.paperWidth = "22in"
+            # ws.page_setup.paperHeight = "34in"
+
+            # Set the column widths. 
+            setColumnWidths(ws, 2.6)
+
+            int_slots = {}
+            vert_offset = [0, 1, 2, 3, 4]
+            hori_offset = [0, 1, 2]
+
+            # Create a dictionary with int numbers as the key and cell addresses as the value 
+            for h in hori_offset: 
+                for v in vert_offset: 
+                    base_slot = relativeToCell(page, [('down', 9), ('right', 13)])
+                    input_slot = relativeToCell(base_slot, [('down', 30 * v), ('right', 26 * h)])
+                    if ws_inputs_22x34[input_slot].value is not None:
+                            offset_base_slot = relativeToCell(input_pages[0], [('down', 9), ('right', 13)])
+                            offset_input_slot = relativeToCell(offset_base_slot, [('down', 30 * v), ('right', 26 * h)])
+                            int_slots[ws_inputs_22x34[input_slot].value] = offset_input_slot
+            
+            # print('int_slots')
+            # print(int_slots)
+
+            # for i in range(len(df_scenario.index)):
+            #     int_number = df_scenario.loc[i, 'Int. ID 1']
+            #     slot_address = int_slots[int_number]
+            #     generateFigure(ws, df, i, slot_address)
+            #     populateFigure(ws, df, i, slot_address)
+
+            for i in range(len(df_scenario.index)):
+
+                int_number = df.loc[i, 'Int. ID 1']
+                if int_number in int_slots:
+                    slot_address = int_slots[int_number]
+                    # print('i : ' + str(i))
+                    # print('int_number : ' + str(int_number))
+                    # print('slot_address: ' + slot_address)
+                    generateFigure(ws, df_scenario, i, slot_address)
+                    populateFigure(ws, df_scenario, i, slot_address, False)
+
+                    progress = progress + progress_i
+                    print(str(round(progress * 100)) + '% complete for 22x34 Layout Portrait - Lane Geometry! (' + str(page_name) + ')' )
+
+            page_num = page_num + 1
+            page_name = 'Page ' + str(page_num)
+
+        # Remove the default 'Sheet' worksheet and save the workbook. 
+        wb.remove(wb['Sheet'])
+        wb.save(fr'{application_path}\Figures_22x34_Layout_LaneGeom_Portrait.xlsx')
+
+        # Open the file. 
+        os.system(f"start EXCEL.EXE {'Figures_22x34_Layout_LaneGeom_Portrait.xlsx'}")
+        print(f'\nYour Excel file has been processed and saved to the following directory: \n \
+            "{'Figures_22x34_Layout_LaneGeom_Portrait.xlsx'}" \nOpening Excel file...')
+
+        """
+        ws = wb.create_sheet(page_22x34_scenario_name_portrait)
+        ws.sheet_view.zoomScale = 55
+
+        # Set the column widths. 
+        setColumnWidths(ws, 2.6)
+        """
+
+    print('Desired Scenario is ' + page_22x34_scenario_name_portrait_lane_geom + '\n')
+    
